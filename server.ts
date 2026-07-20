@@ -9,7 +9,10 @@ import fs from 'fs';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore, collection, getDocs, setDoc, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { initializeFirestore, collection, getDocs, setDoc, doc, deleteDoc, writeBatch, setLogLevel } from 'firebase/firestore';
+
+// Silenciar logs internos do SDK do Firestore para evitar logs irrelevantes de desconexão de canais ociosos (idle streams)
+setLogLevel('silent');
 
 const app = express();
 const PORT = 3000;
