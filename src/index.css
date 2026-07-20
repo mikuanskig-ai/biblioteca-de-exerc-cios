@@ -1,0 +1,87 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-brand-neon: #39FF14;
+  --color-brand-hover: #2DE600;
+  --color-bg-primary: #050505;
+  --color-bg-secondary: #0D0D0D;
+  --color-bg-card: #111111;
+  --color-bg-hover: #161616;
+  --color-bg-badge: #0F2A12;
+
+  --color-text-title: #FFFFFF;
+  --color-text-primary: #D1D5DB;
+  --color-text-secondary: #9CA3AF;
+  --color-text-disabled: #6B7280;
+}
+
+/* Custom transitions and scrollbar styling */
+@layer base {
+  body {
+    background-color: #050505;
+    color: #D1D5DB;
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #111111 #050505;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #050505;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #111111;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #39FF14;
+  }
+}
+
+/* Micro-animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Shimmer animation for card loaders */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #0D0D0D 25%, #161616 50%, #0D0D0D 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Biblioteca de Exercícios",
+  "description": "Uma biblioteca profissional de exercícios físicos totalmente integrada ao padrão estético de Bia Tisatto Personal Trainer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

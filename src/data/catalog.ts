@@ -1,0 +1,261 @@
+import { CategoriaType, GrupoMuscularType } from '../types';
+
+export interface CatalogExercise {
+  nome: string;
+  categoria: CategoriaType;
+  grupoMuscular: GrupoMuscularType;
+  subGrupo: string;
+}
+
+export const CATALOG_EXERCISES: CatalogExercise[] = [
+  // === MUSCULAÇÃO: PEITO ===
+  { nome: "Supino Reto com Barra", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Supino Reto com Halteres", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Supino Inclinado com Barra", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Supino Inclinado com Halteres", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Supino Declinado", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Crucifixo Reto", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Crucifixo Inclinado", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Crucifixo Declinado", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Peck Deck", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Cross Over Alto", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Cross Over Médio", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Cross Over Baixo", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Flexão de Braço Tradicional", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Flexão Inclinada", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Flexão Declinada", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Pullover com Halter", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+  { nome: "Chest Press Máquina", categoria: "Musculação", grupoMuscular: "Peito", subGrupo: "Peito" },
+
+  // === MUSCULAÇÃO: COSTAS ===
+  { nome: "Puxada Frontal Aberta", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Puxada Frontal Fechada", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Puxada Supinada", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Pulldown", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Barra Fixa", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Barra Fixa Assistida", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Remada Curvada", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Remada Cavalinho", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Remada Baixa", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Remada Unilateral", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Remada Máquina", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Remada T-Bar", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Pull Over na Polia", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Pullover Máquina", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Remada Alta", categoria: "Musculação", grupoMuscular: "Costas", subGrupo: "Costas" },
+
+  // === MUSCULAÇÃO: OMBROS ===
+  { nome: "Desenvolvimento com Barra", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Desenvolvimento com Halteres", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Desenvolvimento na Máquina", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Desenvolvimento Arnold", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Elevação Lateral", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Elevação Frontal", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Elevação Frontal Alternada", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Crucifixo Invertido", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Face Pull", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Desenvolvimento no Smith", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Elevação Lateral no Cabo", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Elevação Frontal no Cabo", categoria: "Musculação", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+
+  // === MUSCULAÇÃO: TRAPÉZIO ===
+  { nome: "Encolhimento com Barra", categoria: "Musculação", grupoMuscular: "Trapézio", subGrupo: "Trapézio" },
+  { nome: "Encolhimento com Halteres", categoria: "Musculação", grupoMuscular: "Trapézio", subGrupo: "Trapézio" },
+  { nome: "Encolhimento Smith", categoria: "Musculação", grupoMuscular: "Trapézio", subGrupo: "Trapézio" },
+  { nome: "Encolhimento na Máquina", categoria: "Musculação", grupoMuscular: "Trapézio", subGrupo: "Trapézio" },
+
+  // === MUSCULAÇÃO: BÍCEPS ===
+  { nome: "Rosca Direta", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+  { nome: "Rosca Alternada", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+  { nome: "Rosca Martelo", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+  { nome: "Rosca Scott", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+  { nome: "Rosca Concentrada", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+  { nome: "Rosca 21", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+  { nome: "Rosca Inversa", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+  { nome: "Rosca no Cabo", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+  { nome: "Rosca Spider", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+  { nome: "Rosca Banco Inclinado", categoria: "Musculação", grupoMuscular: "Bíceps", subGrupo: "Bíceps" },
+
+  // === MUSCULAÇÃO: TRÍCEPS ===
+  { nome: "Tríceps Pulley", categoria: "Musculação", grupoMuscular: "Tríceps", subGrupo: "Tríceps" },
+  { nome: "Tríceps Corda", categoria: "Musculação", grupoMuscular: "Tríceps", subGrupo: "Tríceps" },
+  { nome: "Tríceps Francês", categoria: "Musculação", grupoMuscular: "Tríceps", subGrupo: "Tríceps" },
+  { nome: "Tríceps Testa", categoria: "Musculação", grupoMuscular: "Tríceps", subGrupo: "Tríceps" },
+  { nome: "Tríceps Banco", categoria: "Musculação", grupoMuscular: "Tríceps", subGrupo: "Tríceps" },
+  { nome: "Tríceps Coice", categoria: "Musculação", grupoMuscular: "Tríceps", subGrupo: "Tríceps" },
+  { nome: "Tríceps Unilateral", categoria: "Musculação", grupoMuscular: "Tríceps", subGrupo: "Tríceps" },
+  { nome: "Mergulho nas Paralelas", categoria: "Musculação", grupoMuscular: "Tríceps", subGrupo: "Tríceps" },
+  { nome: "Tríceps Barra W", categoria: "Musculação", grupoMuscular: "Tríceps", subGrupo: "Tríceps" },
+
+  // === MUSCULAÇÃO: ANTEBRAÇO ===
+  { nome: "Rosca Punho", categoria: "Musculação", grupoMuscular: "Antebraço", subGrupo: "Antebraço" },
+  { nome: "Rosca Punho Inversa", categoria: "Musculação", grupoMuscular: "Antebraço", subGrupo: "Antebraço" },
+  { nome: "Farmer Walk (Antebraço)", categoria: "Musculação", grupoMuscular: "Antebraço", subGrupo: "Antebraço" },
+  { nome: "Pronação de Punho", categoria: "Musculação", grupoMuscular: "Antebraço", subGrupo: "Antebraço" },
+  { nome: "Supinação de Punho", categoria: "Musculação", grupoMuscular: "Antebraço", subGrupo: "Antebraço" },
+  { nome: "Wrist Roller", categoria: "Musculação", grupoMuscular: "Antebraço", subGrupo: "Antebraço" },
+
+  // === MUSCULAÇÃO: ABDÔMEN ===
+  { nome: "Abdominal Tradicional", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Abdominal Infra", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Abdominal Canivete", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Abdominal Oblíquo", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Prancha Abdominal", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Prancha Lateral", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Elevação de Pernas", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Abdominal na Polia", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Abdominal Máquina", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Hollow Hold", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Dead Bug", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+  { nome: "Mountain Climbers", categoria: "Musculação", grupoMuscular: "Abdômen", subGrupo: "Abdômen" },
+
+  // === MUSCULAÇÃO: LOMBAR ===
+  { nome: "Extensão Lombar", categoria: "Musculação", grupoMuscular: "Lombar", subGrupo: "Lombar" },
+  { nome: "Superman", categoria: "Musculação", grupoMuscular: "Lombar", subGrupo: "Lombar" },
+  { nome: "Good Morning (Lombar)", categoria: "Musculação", grupoMuscular: "Lombar", subGrupo: "Lombar" },
+  { nome: "Hiperextensão Banco Romano", categoria: "Musculação", grupoMuscular: "Lombar", subGrupo: "Lombar" },
+  { nome: "Bird Dog", categoria: "Musculação", grupoMuscular: "Lombar", subGrupo: "Lombar" },
+
+  // === MUSCULAÇÃO: QUADRÍCEPS ===
+  { nome: "Agachamento Livre", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Agachamento Frontal", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Agachamento Smith", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Agachamento Hack", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Leg Press 45°", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Leg Press Horizontal", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Cadeira Extensora", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Afundo", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Passada", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Bulgarian Split Squat", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Sissy Squat", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Step Up (Quadríceps)", categoria: "Musculação", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+
+  // === MUSCULAÇÃO: POSTERIOR DE COXA ===
+  { nome: "Mesa Flexora", categoria: "Musculação", grupoMuscular: "Posterior", subGrupo: "Posterior de Coxa" },
+  { nome: "Cadeira Flexora", categoria: "Musculação", grupoMuscular: "Posterior", subGrupo: "Posterior de Coxa" },
+  { nome: "Stiff", categoria: "Musculação", grupoMuscular: "Posterior", subGrupo: "Posterior de Coxa" },
+  { nome: "Levantamento Terra Romeno", categoria: "Musculação", grupoMuscular: "Posterior", subGrupo: "Posterior de Coxa" },
+  { nome: "Good Morning (Posterior)", categoria: "Musculação", grupoMuscular: "Posterior", subGrupo: "Posterior de Coxa" },
+  { nome: "Glute Ham Raise", categoria: "Musculação", grupoMuscular: "Posterior", subGrupo: "Posterior de Coxa" },
+  { nome: "Nordic Curl", categoria: "Musculação", grupoMuscular: "Posterior", subGrupo: "Posterior de Coxa" },
+
+  // === MUSCULAÇÃO: GLÚTEOS ===
+  { nome: "Elevação Pélvica", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Hip Thrust", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Glúteo Máquina", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Coice na Polia", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Coice Máquina", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Abdução Máquina", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Agachamento Sumô", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Ponte de Glúteo", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Step Up (Glúteos)", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Donkey Kick", categoria: "Musculação", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+
+  // === MUSCULAÇÃO: ADUTORES ===
+  { nome: "Cadeira Adutora", categoria: "Musculação", grupoMuscular: "Adutores", subGrupo: "Adutores" },
+  { nome: "Agachamento Sumô (Adutores)", categoria: "Musculação", grupoMuscular: "Adutores", subGrupo: "Adutores" },
+  { nome: "Afundo Lateral", categoria: "Musculação", grupoMuscular: "Adutores", subGrupo: "Adutores" },
+  { nome: "Copenhagen Plank", categoria: "Musculação", grupoMuscular: "Adutores", subGrupo: "Adutores" },
+
+  // === MUSCULAÇÃO: ABDUTORES ===
+  { nome: "Cadeira Abdutora", categoria: "Musculação", grupoMuscular: "Abdutores", subGrupo: "Abdutores" },
+  { nome: "Caminhada Lateral com Mini Band", categoria: "Musculação", grupoMuscular: "Abdutores", subGrupo: "Abdutores" },
+  { nome: "Elevação Lateral de Perna", categoria: "Musculação", grupoMuscular: "Abdutores", subGrupo: "Abdutores" },
+  { nome: "Monster Walk", categoria: "Musculação", grupoMuscular: "Abdutores", subGrupo: "Abdutores" },
+
+  // === MUSCULAÇÃO: PANTURRILHAS ===
+  { nome: "Panturrilha em Pé", categoria: "Musculação", grupoMuscular: "Panturrilhas", subGrupo: "Panturrilhas" },
+  { nome: "Panturrilha Sentado", categoria: "Musculação", grupoMuscular: "Panturrilhas", subGrupo: "Panturrilhas" },
+  { nome: "Panturrilha no Leg Press", categoria: "Musculação", grupoMuscular: "Panturrilhas", subGrupo: "Panturrilhas" },
+  { nome: "Panturrilha Smith", categoria: "Musculação", grupoMuscular: "Panturrilhas", subGrupo: "Panturrilhas" },
+  { nome: "Panturrilha Unilateral", categoria: "Musculação", grupoMuscular: "Panturrilhas", subGrupo: "Panturrilhas" },
+
+  // === CARDIO ===
+  { nome: "Caminhada (Esteira)", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Esteira" },
+  { nome: "Caminhada Inclinada", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Esteira" },
+  { nome: "Corrida Leve (Esteira)", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Esteira" },
+  { nome: "Corrida Moderada (Esteira)", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Esteira" },
+  { nome: "Sprint (Esteira)", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Esteira" },
+  { nome: "Bike Horizontal", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Bicicleta" },
+  { nome: "Bike Vertical", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Bicicleta" },
+  { nome: "Bike HIIT", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Bicicleta" },
+  { nome: "Elíptico Tradicional", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Elíptico" },
+  { nome: "Elíptico Intervalado", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Elíptico" },
+  { nome: "Stair Climber (Escada)", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Escada" },
+  { nome: "Escada Intervalada", categoria: "Cardio", grupoMuscular: "Quadríceps", subGrupo: "Escada" },
+  { nome: "Pular Corda", categoria: "Cardio", grupoMuscular: "Panturrilhas", subGrupo: "Corda" },
+  { nome: "Double Under (Pular Corda)", categoria: "Cardio", grupoMuscular: "Panturrilhas", subGrupo: "Corda" },
+  { nome: "Remo Indoor", categoria: "Cardio", grupoMuscular: "Costas", subGrupo: "Remo" },
+
+  // === ALONGAMENTOS ===
+  { nome: "Alongamento Cervical Lateral", categoria: "Alongamentos", grupoMuscular: "Ombros", subGrupo: "Pescoço" },
+  { nome: "Alongamento Cervical Frontal", categoria: "Alongamentos", grupoMuscular: "Ombros", subGrupo: "Pescoço" },
+  { nome: "Alongamento Deltoide", categoria: "Alongamentos", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Alongamento Manguito Rotador", categoria: "Alongamentos", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Alongamento de Peito na Parede", categoria: "Alongamentos", grupoMuscular: "Peito", subGrupo: "Peitoral" },
+  { nome: "Alongamento de Peito em Porta", categoria: "Alongamentos", grupoMuscular: "Peito", subGrupo: "Peitoral" },
+  { nome: "Postura da Criança (Child's Pose)", categoria: "Alongamentos", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Alongamento do Gato (Cat-Cow)", categoria: "Alongamentos", grupoMuscular: "Costas", subGrupo: "Costas" },
+  { nome: "Joelhos ao Peito (Knees-to-Chest)", categoria: "Alongamentos", grupoMuscular: "Lombar", subGrupo: "Lombar" },
+  { nome: "Rotação Lombar Deitado", categoria: "Alongamentos", grupoMuscular: "Lombar", subGrupo: "Lombar" },
+  { nome: "Alongamento de Quadríceps em Pé", categoria: "Alongamentos", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Alongamento de Quadríceps Deitado", categoria: "Alongamentos", grupoMuscular: "Quadríceps", subGrupo: "Quadríceps" },
+  { nome: "Alongamento de Isquiotibiais Sentado", categoria: "Alongamentos", grupoMuscular: "Posterior", subGrupo: "Posterior de Coxa" },
+  { nome: "Alongamento de Isquiotibiais em Pé", categoria: "Alongamentos", grupoMuscular: "Posterior", subGrupo: "Posterior de Coxa" },
+  { nome: "Alongamento de Glúteos Figura 4", categoria: "Alongamentos", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Pigeon Stretch (Alongamento de Glúteo)", categoria: "Alongamentos", grupoMuscular: "Glúteos", subGrupo: "Glúteos" },
+  { nome: "Alongamento de Panturrilha na Parede", categoria: "Alongamentos", grupoMuscular: "Panturrilhas", subGrupo: "Panturrilhas" },
+  { nome: "Alongamento de Panturrilha no Degrau", categoria: "Alongamentos", grupoMuscular: "Panturrilhas", subGrupo: "Panturrilhas" },
+
+  // === MOBILIDADE ===
+  { nome: "Shoulder CARs", categoria: "Mobilidade", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "Wall Slides", categoria: "Mobilidade", grupoMuscular: "Ombros", subGrupo: "Ombros" },
+  { nome: "World's Greatest Stretch", categoria: "Mobilidade", grupoMuscular: "Glúteos", subGrupo: "Quadril" },
+  { nome: "90/90 Hip Stretch", categoria: "Mobilidade", grupoMuscular: "Glúteos", subGrupo: "Quadril" },
+  { nome: "Hip CARs", categoria: "Mobilidade", grupoMuscular: "Glúteos", subGrupo: "Quadril" },
+  { nome: "Rotação Torácica", categoria: "Mobilidade", grupoMuscular: "Costas", subGrupo: "Torácica" },
+  { nome: "Open Book (Rotação Torácica)", categoria: "Mobilidade", grupoMuscular: "Costas", subGrupo: "Torácica" },
+  { nome: "Mobilidade de Tornozelo Unilateral", categoria: "Mobilidade", grupoMuscular: "Panturrilhas", subGrupo: "Tornozelo" },
+  { nome: "Joelho na Parede (Tornozelo)", categoria: "Mobilidade", grupoMuscular: "Panturrilhas", subGrupo: "Tornozelo" },
+  { nome: "Mobilidade de Punho no Solo", categoria: "Mobilidade", grupoMuscular: "Antebraço", subGrupo: "Punhos" },
+  { nome: "Extensão de Punho Controlada", categoria: "Mobilidade", grupoMuscular: "Antebraço", subGrupo: "Punhos" },
+
+  // === FUNCIONAL ===
+  { nome: "Burpee", categoria: "Funcional", grupoMuscular: "Peito", subGrupo: "Funcional" },
+  { nome: "Kettlebell Swing", categoria: "Funcional", grupoMuscular: "Posterior", subGrupo: "Funcional" },
+  { nome: "Battle Rope", categoria: "Funcional", grupoMuscular: "Ombros", subGrupo: "Funcional" },
+  { nome: "Box Jump", categoria: "Funcional", grupoMuscular: "Quadríceps", subGrupo: "Funcional" },
+  { nome: "Box Step", categoria: "Funcional", grupoMuscular: "Quadríceps", subGrupo: "Funcional" },
+  { nome: "Slam Ball", categoria: "Funcional", grupoMuscular: "Abdômen", subGrupo: "Funcional" },
+  { nome: "Wall Ball", categoria: "Funcional", grupoMuscular: "Quadríceps", subGrupo: "Funcional" },
+  { nome: "Sled Push", categoria: "Funcional", grupoMuscular: "Quadríceps", subGrupo: "Funcional" },
+  { nome: "Sled Pull", categoria: "Funcional", grupoMuscular: "Costas", subGrupo: "Funcional" },
+  { nome: "Agilidade na Escada", categoria: "Funcional", grupoMuscular: "Panturrilhas", subGrupo: "Funcional" },
+  { nome: "Farmer Walk (Funcional)", categoria: "Funcional", grupoMuscular: "Antebraço", subGrupo: "Funcional" },
+  { nome: "Bear Crawl", categoria: "Funcional", grupoMuscular: "Abdômen", subGrupo: "Funcional" },
+  { nome: "Crab Walk", categoria: "Funcional", grupoMuscular: "Glúteos", subGrupo: "Funcional" },
+  { nome: "Turkish Get Up", categoria: "Funcional", grupoMuscular: "Ombros", subGrupo: "Funcional" },
+  { nome: "Thruster", categoria: "Funcional", grupoMuscular: "Quadríceps", subGrupo: "Funcional" },
+  { nome: "Clean", categoria: "Funcional", grupoMuscular: "Quadríceps", subGrupo: "Funcional" },
+  { nome: "Push Press", categoria: "Funcional", grupoMuscular: "Ombros", subGrupo: "Funcional" },
+
+  // === REABILITAÇÃO ===
+  { nome: "Rotação Externa com Elástico", categoria: "Reabilitação", grupoMuscular: "Ombros", subGrupo: "Ombro" },
+  { nome: "Rotação Interna com Elástico", categoria: "Reabilitação", grupoMuscular: "Ombros", subGrupo: "Ombro" },
+  { nome: "Face Pull Leve (Corretivo)", categoria: "Reabilitação", grupoMuscular: "Ombros", subGrupo: "Ombro" },
+  { nome: "Terminal Knee Extension (TKE)", categoria: "Reabilitação", grupoMuscular: "Quadríceps", subGrupo: "Joelho" },
+  { nome: "Mini Agachamento", categoria: "Reabilitação", grupoMuscular: "Quadríceps", subGrupo: "Joelho" },
+  { nome: "Step Down Controlado", categoria: "Reabilitação", grupoMuscular: "Quadríceps", subGrupo: "Joelho" },
+  { nome: "Ponte de Glúteo (Reabilitação)", categoria: "Reabilitação", grupoMuscular: "Glúteos", subGrupo: "Quadril" },
+  { nome: "Clamshell", categoria: "Reabilitação", grupoMuscular: "Glúteos", subGrupo: "Quadril" },
+  { nome: "Abdução de Quadril com Mini Band", categoria: "Reabilitação", grupoMuscular: "Abdutores", subGrupo: "Quadril" },
+  { nome: "Bird Dog (Corretivo)", categoria: "Reabilitação", grupoMuscular: "Lombar", subGrupo: "Lombar" },
+  { nome: "Dead Bug (Corretivo)", categoria: "Reabilitação", grupoMuscular: "Abdômen", subGrupo: "Lombar" },
+  { nome: "McGill Curl Up", categoria: "Reabilitação", grupoMuscular: "Abdômen", subGrupo: "Lombar" },
+  { nome: "Equilíbrio Unilateral (Tornozelo)", categoria: "Reabilitação", grupoMuscular: "Panturrilhas", subGrupo: "Tornozelo" },
+  { nome: "Elevação de Panturrilha Controlada", categoria: "Reabilitação", grupoMuscular: "Panturrilhas", subGrupo: "Tornozelo" },
+  { nome: "Scapular Push Up", categoria: "Reabilitação", grupoMuscular: "Costas", subGrupo: "Escápula" },
+  { nome: "Y Raise (Y-T-W-L)", categoria: "Reabilitação", grupoMuscular: "Ombros", subGrupo: "Escápula" },
+  { nome: "T Raise (Y-T-W-L)", categoria: "Reabilitação", grupoMuscular: "Ombros", subGrupo: "Escápula" },
+  { nome: "W Raise (Y-T-W-L)", categoria: "Reabilitação", grupoMuscular: "Ombros", subGrupo: "Escápula" }
+];
