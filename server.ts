@@ -9,7 +9,7 @@ import fs from 'fs';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { initializeFirestore, collection, getDocs, setDoc, doc, deleteDoc, writeBatch } from 'firebase/firestore';
 
 const app = express();
 const PORT = 3000;
@@ -82,7 +82,9 @@ async function initFirebaseAndCache() {
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       const firebaseApp = initializeApp(config);
-      db = getFirestore(firebaseApp, config.firestoreDatabaseId || '(default)');
+      db = initializeFirestore(firebaseApp, {
+        experimentalForceLongPolling: true
+      }, config.firestoreDatabaseId || '(default)');
       console.log('Firebase Firestore inicializado com sucesso.');
 
       // Buscar exercícios do Firestore
@@ -91,9 +93,17 @@ async function initFirebaseAndCache() {
       
       if (querySnapshot.empty) {
         console.log('Firestore está vazio. Semeando com os exercícios do arquivo local...');
-        // Semear banco de dados com os exercícios que já existem localmente
-        for (const ex of cachedExercises) {
-          await setDoc(doc(db, 'exercises', ex.id), ex);
+        // Semear banco de dados com os exercícios que já existem localmente em lotes de 500
+        const batchSize = 500;
+        for (let i = 0; i < cachedExercises.length; i += batchSize) {
+          const chunk = cachedExercises.slice(i, i + batchSize);
+          const batch = writeBatch(db);
+          for (const ex of chunk) {
+            const docRef = doc(db, 'exercises', ex.id);
+            batch.set(docRef, ex);
+          }
+          await batch.commit();
+          console.log(`Semeado lote de ${chunk.length} exercícios no Firestore.`);
         }
         console.log(`Semeado ${cachedExercises.length} exercícios no Firestore.`);
       } else {
@@ -125,8 +135,17 @@ async function initFirebaseAndCache() {
   }
 }
 
+let initPromise: Promise<void> | null = null;
+
+function getInitPromise(): Promise<void> {
+  if (!initPromise) {
+    initPromise = initFirebaseAndCache();
+  }
+  return initPromise;
+}
+
 // Inicializar imediatamente em segundo plano ao carregar o módulo
-initFirebaseAndCache();
+getInitPromise();
 
 function readExercises(): any[] {
   return cachedExercises;
@@ -638,9 +657,15 @@ let syncProgress = {
 };
 
 // API Routes
-app.get('/api/exercises', (req, res) => {
-  const exercises = readExercises();
-  res.json(exercises);
+app.get('/api/exercises', async (req, res) => {
+  try {
+    await getInitPromise();
+    const exercises = readExercises();
+    res.json(exercises);
+  } catch (err: any) {
+    console.error('Erro ao buscar exercícios:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar exercícios.', details: err.message });
+  }
 });
 
 app.get('/api/sync/status', (req, res) => {
@@ -752,9 +777,23 @@ app.post('/api/sync/all', async (req, res) => {
       }
 
       writeExercises(updatedExercises);
-      // Salvar os exercícios atualizados no Firestore também
-      for (const ex of updatedExercises) {
-        await saveExerciseToFirestore(ex);
+      // Salvar os exercícios atualizados no Firestore também em lotes de 500
+      if (db) {
+        try {
+          const batchSize = 500;
+          for (let i = 0; i < updatedExercises.length; i += batchSize) {
+            const chunk = updatedExercises.slice(i, i + batchSize);
+            const batch = writeBatch(db);
+            for (const ex of chunk) {
+              const docRef = doc(db, 'exercises', ex.id);
+              batch.set(docRef, ex);
+            }
+            await batch.commit();
+            console.log(`Sincronizado lote de ${chunk.length} exercícios no Firestore.`);
+          }
+        } catch (fsErr) {
+          console.error('Erro ao salvar exercícios sincronizados no Firestore:', fsErr);
+        }
       }
     } catch (err) {
       console.error('Erro na sincronização em lote:', err);
@@ -766,132 +805,156 @@ app.post('/api/sync/all', async (req, res) => {
   res.json({ message: 'Sincronização iniciada em plano de fundo.', total: exercises.length });
 });
 
-app.get('/api/exercises/:slug', (req, res) => {
-  const exercises = readExercises();
-  const exercise = exercises.find(ex => ex.slug === req.params.slug);
-  if (!exercise) {
-    return res.status(404).json({ error: 'Exercício não encontrado' });
+app.get('/api/exercises/:slug', async (req, res) => {
+  try {
+    await getInitPromise();
+    const exercises = readExercises();
+    const exercise = exercises.find(ex => ex.slug === req.params.slug);
+    if (!exercise) {
+      return res.status(404).json({ error: 'Exercício não encontrado' });
+    }
+    res.json(exercise);
+  } catch (err: any) {
+    console.error('Erro ao buscar exercício por slug:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar exercício.', details: err.message });
   }
-  res.json(exercise);
 });
 
 app.post('/api/exercises', async (req, res) => {
-  const exercises = readExercises();
-  const newEx = req.body;
-
-  if (!newEx.nome) {
-    return res.status(404).json({ error: 'O nome do exercício é obrigatório.' });
-  }
-
-  // Set default values and generate id/slug/timestamps
-  const slug = slugify(newEx.nome);
-  const existingWithSlug = exercises.find(ex => ex.slug === slug);
-  const finalSlug = existingWithSlug ? `${slug}-${Date.now().toString().slice(-4)}` : slug;
-
-  let exerciseToSave = {
-    ...newEx,
-    id: newEx.id || `ex_${Date.now()}`,
-    slug: finalSlug,
-    categoria: newEx.categoria || 'Musculação',
-    grupoMuscular: newEx.grupoMuscular || 'Pernas',
-    nivel: newEx.nivel || 'Iniciante',
-    equipamentos: Array.isArray(newEx.equipamentos) ? newEx.equipamentos : [],
-    musculos: Array.isArray(newEx.musculos) ? newEx.musculos : [],
-    descricao: newEx.descricao || '',
-    objetivo: newEx.objetivo || '',
-    execucao: Array.isArray(newEx.execucao) ? newEx.execucao : [],
-    respiracao: newEx.respiracao || '',
-    dicas: Array.isArray(newEx.dicas) ? newEx.dicas : [],
-    erros: Array.isArray(newEx.erros) ? newEx.erros : [],
-    beneficios: newEx.beneficios || '',
-    contraindicacoes: newEx.contraindicacoes || '',
-    variacoes: Array.isArray(newEx.variacoes) ? newEx.variacoes : [],
-    gif: newEx.gif || '',
-    video: newEx.video || '',
-    tags: Array.isArray(newEx.tags) ? newEx.tags : [slug],
-    ativo: typeof newEx.ativo === 'boolean' ? newEx.ativo : true,
-    criadoEm: new Date().toISOString(),
-    atualizadoEm: new Date().toISOString(),
-  };
-
-  // Auto-sync with ExerciseDB
   try {
-    const dbData = await getExerciseDbData();
-    if (dbData && dbData.length > 0) {
-      exerciseToSave = syncSingleExerciseWithDb(exerciseToSave, dbData);
-    }
-  } catch (err) {
-    console.error('Erro ao sincronizar exercício recém-criado:', err);
-  }
+    await getInitPromise();
+    const exercises = readExercises();
+    const newEx = req.body;
 
-  exercises.push(exerciseToSave);
-  if (writeExercises(exercises)) {
-    saveExerciseToFirestore(exerciseToSave);
-    res.status(201).json(exerciseToSave);
-  } else {
-    res.status(500).json({ error: 'Não foi possível salvar o exercício no banco de dados.' });
+    if (!newEx.nome) {
+      return res.status(404).json({ error: 'O nome do exercício é obrigatório.' });
+    }
+
+    // Set default values and generate id/slug/timestamps
+    const slug = slugify(newEx.nome);
+    const existingWithSlug = exercises.find(ex => ex.slug === slug);
+    const finalSlug = existingWithSlug ? `${slug}-${Date.now().toString().slice(-4)}` : slug;
+
+    let exerciseToSave = {
+      ...newEx,
+      id: newEx.id || `ex_${Date.now()}`,
+      slug: finalSlug,
+      categoria: newEx.categoria || 'Musculação',
+      grupoMuscular: newEx.grupoMuscular || 'Pernas',
+      nivel: newEx.nivel || 'Iniciante',
+      equipamentos: Array.isArray(newEx.equipamentos) ? newEx.equipamentos : [],
+      musculos: Array.isArray(newEx.musculos) ? newEx.musculos : [],
+      descricao: newEx.descricao || '',
+      objetivo: newEx.objetivo || '',
+      execucao: Array.isArray(newEx.execucao) ? newEx.execucao : [],
+      respiracao: newEx.respiracao || '',
+      dicas: Array.isArray(newEx.dicas) ? newEx.dicas : [],
+      erros: Array.isArray(newEx.erros) ? newEx.erros : [],
+      beneficios: newEx.beneficios || '',
+      contraindicacoes: newEx.contraindicacoes || '',
+      variacoes: Array.isArray(newEx.variacoes) ? newEx.variacoes : [],
+      gif: newEx.gif || '',
+      video: newEx.video || '',
+      tags: Array.isArray(newEx.tags) ? newEx.tags : [slug],
+      ativo: typeof newEx.ativo === 'boolean' ? newEx.ativo : true,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString(),
+    };
+
+    // Auto-sync with ExerciseDB
+    try {
+      const dbData = await getExerciseDbData();
+      if (dbData && dbData.length > 0) {
+        exerciseToSave = syncSingleExerciseWithDb(exerciseToSave, dbData);
+      }
+    } catch (err) {
+      console.error('Erro ao sincronizar exercício recém-criado:', err);
+    }
+
+    exercises.push(exerciseToSave);
+    if (writeExercises(exercises)) {
+      saveExerciseToFirestore(exerciseToSave);
+      res.status(201).json(exerciseToSave);
+    } else {
+      res.status(500).json({ error: 'Não foi possível salvar o exercício no banco de dados.' });
+    }
+  } catch (err: any) {
+    console.error('Erro ao criar exercício:', err);
+    res.status(500).json({ error: 'Erro interno ao criar exercício.', details: err.message });
   }
 });
 
 app.put('/api/exercises/:id', async (req, res) => {
-  const exercises = readExercises();
-  const index = exercises.findIndex(ex => ex.id === req.params.id);
-
-  if (index === -1) {
-    return res.status(404).json({ error: 'Exercício não encontrado.' });
-  }
-
-  const updatedEx = req.body;
-  const currentEx = exercises[index];
-
-  // Keep slug based on name if name changed, otherwise preserve it
-  let finalSlug = currentEx.slug;
-  if (updatedEx.nome && updatedEx.nome !== currentEx.nome) {
-    const slug = slugify(updatedEx.nome);
-    const existingWithSlug = exercises.find(ex => ex.slug === slug && ex.id !== req.params.id);
-    finalSlug = existingWithSlug ? `${slug}-${Date.now().toString().slice(-4)}` : slug;
-  }
-
-  let exerciseToSave = {
-    ...currentEx,
-    ...updatedEx,
-    slug: finalSlug,
-    atualizadoEm: new Date().toISOString()
-  };
-
-  // Auto-sync with ExerciseDB on update
   try {
-    const dbData = await getExerciseDbData();
-    if (dbData && dbData.length > 0) {
-      exerciseToSave = syncSingleExerciseWithDb(exerciseToSave, dbData);
+    await getInitPromise();
+    const exercises = readExercises();
+    const index = exercises.findIndex(ex => ex.id === req.params.id);
+
+    if (index === -1) {
+      return res.status(404).json({ error: 'Exercício não encontrado.' });
     }
-  } catch (err) {
-    console.error('Erro ao sincronizar exercício atualizado:', err);
-  }
 
-  exercises[index] = exerciseToSave;
+    const updatedEx = req.body;
+    const currentEx = exercises[index];
 
-  if (writeExercises(exercises)) {
-    saveExerciseToFirestore(exerciseToSave);
-    res.json(exercises[index]);
-  } else {
-    res.status(500).json({ error: 'Não foi possível atualizar o exercício no banco de dados.' });
+    // Keep slug based on name if name changed, otherwise preserve it
+    let finalSlug = currentEx.slug;
+    if (updatedEx.nome && updatedEx.nome !== currentEx.nome) {
+      const slug = slugify(updatedEx.nome);
+      const existingWithSlug = exercises.find(ex => ex.slug === slug && ex.id !== req.params.id);
+      finalSlug = existingWithSlug ? `${slug}-${Date.now().toString().slice(-4)}` : slug;
+    }
+
+    let exerciseToSave = {
+      ...currentEx,
+      ...updatedEx,
+      slug: finalSlug,
+      atualizadoEm: new Date().toISOString()
+    };
+
+    // Auto-sync with ExerciseDB on update
+    try {
+      const dbData = await getExerciseDbData();
+      if (dbData && dbData.length > 0) {
+        exerciseToSave = syncSingleExerciseWithDb(exerciseToSave, dbData);
+      }
+    } catch (err) {
+      console.error('Erro ao sincronizar exercício atualizado:', err);
+    }
+
+    exercises[index] = exerciseToSave;
+
+    if (writeExercises(exercises)) {
+      saveExerciseToFirestore(exerciseToSave);
+      res.json(exercises[index]);
+    } else {
+      res.status(500).json({ error: 'Não foi possível atualizar o exercício no banco de dados.' });
+    }
+  } catch (err: any) {
+    console.error('Erro ao atualizar exercício:', err);
+    res.status(500).json({ error: 'Erro interno ao atualizar exercício.', details: err.message });
   }
 });
 
-app.delete('/api/exercises/:id', (req, res) => {
-  const exercises = readExercises();
-  const filtered = exercises.filter(ex => ex.id !== req.params.id);
+app.delete('/api/exercises/:id', async (req, res) => {
+  try {
+    await getInitPromise();
+    const exercises = readExercises();
+    const filtered = exercises.filter(ex => ex.id !== req.params.id);
 
-  if (filtered.length === exercises.length) {
-    return res.status(404).json({ error: 'Exercício não encontrado.' });
-  }
+    if (filtered.length === exercises.length) {
+      return res.status(404).json({ error: 'Exercício não encontrado.' });
+    }
 
-  if (writeExercises(filtered)) {
-    deleteExerciseFromFirestore(req.params.id);
-    res.json({ success: true, message: 'Exercício excluído com sucesso.' });
-  } else {
-    res.status(500).json({ error: 'Não foi possível salvar a alteração no banco de dados.' });
+    if (writeExercises(filtered)) {
+      deleteExerciseFromFirestore(req.params.id);
+      res.json({ success: true, message: 'Exercício excluído com sucesso.' });
+    } else {
+      res.status(500).json({ error: 'Não foi possível salvar a alteração no banco de dados.' });
+    }
+  } catch (err: any) {
+    console.error('Erro ao excluir exercício:', err);
+    res.status(500).json({ error: 'Erro interno ao excluir exercício.', details: err.message });
   }
 });
 
