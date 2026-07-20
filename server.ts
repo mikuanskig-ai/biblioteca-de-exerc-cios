@@ -8,6 +8,8 @@ import path from 'path';
 import fs from 'fs';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore';
 
 const app = express();
 const PORT = 3000;
@@ -38,38 +40,115 @@ function getAiClient(): GoogleGenAI {
   return aiClient;
 }
 
-// Database helper functions
-function readExercises(): any[] {
+// --- Firebase Configuration & In-Memory Caching ---
+let cachedExercises: any[] = [];
+let db: any = null;
+
+async function saveExerciseToFirestore(ex: any) {
+  if (!db) return;
   try {
-    if (!fs.existsSync(EXERCISES_FILE_PATH)) {
-      // Ensure the directory exists
+    await setDoc(doc(db, 'exercises', ex.id), ex);
+    console.log(`Exercício ${ex.nome} salvo no Firestore.`);
+  } catch (error) {
+    console.error(`Erro ao salvar ${ex.nome} no Firestore:`, error);
+  }
+}
+
+async function deleteExerciseFromFirestore(id: string) {
+  if (!db) return;
+  try {
+    await deleteDoc(doc(db, 'exercises', id));
+    console.log(`Exercício ${id} deletado do Firestore.`);
+  } catch (error) {
+    console.error(`Erro ao deletar ${id} do Firestore:`, error);
+  }
+}
+
+async function initFirebaseAndCache() {
+  // 1. Carregar do backup local como fallback inicial síncrono/imediato
+  try {
+    if (fs.existsSync(EXERCISES_FILE_PATH)) {
+      const data = fs.readFileSync(EXERCISES_FILE_PATH, 'utf8');
+      cachedExercises = JSON.parse(data);
+      console.log(`Carregado backup local de ${cachedExercises.length} exercícios.`);
+    }
+  } catch (err) {
+    console.error('Erro ao ler backup local inicial:', err);
+  }
+
+  // 2. Inicializar Firebase e sincronizar
+  try {
+    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const firebaseApp = initializeApp(config);
+      db = getFirestore(firebaseApp, config.firestoreDatabaseId || '(default)');
+      console.log('Firebase Firestore inicializado com sucesso.');
+
+      // Buscar exercícios do Firestore
+      console.log('Carregando exercícios do Firestore...');
+      const querySnapshot = await getDocs(collection(db, 'exercises'));
+      
+      if (querySnapshot.empty) {
+        console.log('Firestore está vazio. Semeando com os exercícios do arquivo local...');
+        // Semear banco de dados com os exercícios que já existem localmente
+        for (const ex of cachedExercises) {
+          await setDoc(doc(db, 'exercises', ex.id), ex);
+        }
+        console.log(`Semeado ${cachedExercises.length} exercícios no Firestore.`);
+      } else {
+        const firestoreExercises: any[] = [];
+        querySnapshot.forEach((docSnap) => {
+          firestoreExercises.push(docSnap.data());
+        });
+        cachedExercises = firestoreExercises;
+        console.log(`Carregados ${cachedExercises.length} exercícios do Firestore com sucesso.`);
+        
+        // Atualizar o arquivo local de backup caso não esteja na Vercel
+        if (!process.env.VERCEL) {
+          try {
+            const dir = path.dirname(EXERCISES_FILE_PATH);
+            if (!fs.existsSync(dir)) {
+              fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(EXERCISES_FILE_PATH, JSON.stringify(cachedExercises, null, 2), 'utf8');
+          } catch (e) {
+            console.error('Erro ao atualizar backup local:', e);
+          }
+        }
+      }
+    } else {
+      console.warn('Aviso: firebase-applet-config.json não encontrado. Firestore desabilitado.');
+    }
+  } catch (error) {
+    console.error('Erro ao inicializar Firebase / carregar do Firestore:', error);
+  }
+}
+
+// Inicializar imediatamente em segundo plano ao carregar o módulo
+initFirebaseAndCache();
+
+function readExercises(): any[] {
+  return cachedExercises;
+}
+
+function writeExercises(exercises: any[]): boolean {
+  cachedExercises = exercises;
+  
+  // Atualizar backup local (se não estiver na Vercel)
+  try {
+    if (!process.env.VERCEL) {
       const dir = path.dirname(EXERCISES_FILE_PATH);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      fs.writeFileSync(EXERCISES_FILE_PATH, '[]', 'utf8');
-      return [];
+      fs.writeFileSync(EXERCISES_FILE_PATH, JSON.stringify(exercises, null, 2), 'utf8');
     }
-    const data = fs.readFileSync(EXERCISES_FILE_PATH, 'utf8');
-    return JSON.parse(data);
   } catch (error) {
-    console.error('Erro ao ler banco de dados de exercícios:', error);
-    return [];
+    console.error('Erro ao escrever backup local:', error);
   }
-}
 
-function writeExercises(exercises: any[]): boolean {
-  try {
-    const dir = path.dirname(EXERCISES_FILE_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(EXERCISES_FILE_PATH, JSON.stringify(exercises, null, 2), 'utf8');
-    return true;
-  } catch (error) {
-    console.error('Erro ao escrever banco de dados de exercícios:', error);
-    return false;
-  }
+  return true;
 }
 
 // Helper to generate a slug from text
@@ -673,6 +752,10 @@ app.post('/api/sync/all', async (req, res) => {
       }
 
       writeExercises(updatedExercises);
+      // Salvar os exercícios atualizados no Firestore também
+      for (const ex of updatedExercises) {
+        await saveExerciseToFirestore(ex);
+      }
     } catch (err) {
       console.error('Erro na sincronização em lote:', err);
     } finally {
@@ -743,6 +826,7 @@ app.post('/api/exercises', async (req, res) => {
 
   exercises.push(exerciseToSave);
   if (writeExercises(exercises)) {
+    saveExerciseToFirestore(exerciseToSave);
     res.status(201).json(exerciseToSave);
   } else {
     res.status(500).json({ error: 'Não foi possível salvar o exercício no banco de dados.' });
@@ -788,6 +872,7 @@ app.put('/api/exercises/:id', async (req, res) => {
   exercises[index] = exerciseToSave;
 
   if (writeExercises(exercises)) {
+    saveExerciseToFirestore(exerciseToSave);
     res.json(exercises[index]);
   } else {
     res.status(500).json({ error: 'Não foi possível atualizar o exercício no banco de dados.' });
@@ -803,6 +888,7 @@ app.delete('/api/exercises/:id', (req, res) => {
   }
 
   if (writeExercises(filtered)) {
+    deleteExerciseFromFirestore(req.params.id);
     res.json({ success: true, message: 'Exercício excluído com sucesso.' });
   } else {
     res.status(500).json({ error: 'Não foi possível salvar a alteração no banco de dados.' });
@@ -965,4 +1051,8 @@ async function setupServer() {
   });
 }
 
-setupServer();
+if (!process.env.VERCEL) {
+  setupServer();
+}
+
+export default app;
