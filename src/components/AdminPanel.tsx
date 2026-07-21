@@ -31,6 +31,13 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
   const [syncExCompleted, setSyncExCompleted] = useState(0);
   const [syncExFailed, setSyncExFailed] = useState(0);
 
+  // Sync state tracking (Exercises pull from Firestore)
+  const [isSyncingPull, setIsSyncingPull] = useState(false);
+  const [syncPullTotal, setSyncPullTotal] = useState(0);
+  const [syncPullCurrent, setSyncPullCurrent] = useState(0);
+  const [syncPullCompleted, setSyncPullCompleted] = useState(0);
+  const [syncPullFailed, setSyncPullFailed] = useState(0);
+
   // Poll sync status from server
   const pollSyncStatus = async () => {
     try {
@@ -77,16 +84,41 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
     }
   };
 
+  // Poll exercise pull status from server
+  const pollExercisePullStatus = async () => {
+    try {
+      const response = await fetch('/api/sync/exercises/pull/status');
+      if (response.ok) {
+        const data = await response.json();
+        setIsSyncingPull(data.isSyncing);
+        setSyncPullTotal(data.total);
+        setSyncPullCurrent(data.current);
+        setSyncPullCompleted(data.completed);
+        setSyncPullFailed(data.failed);
+
+        if (!data.isSyncing && isSyncingPull) {
+          // Completed just now!
+          if (onRefreshExercises) onRefreshExercises();
+          triggerSuccess(`Importação concluída! ${data.completed} exercícios puxados do Firestore.`);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao verificar status da importação de exercícios:', err);
+    }
+  };
+
   // Check sync status on mount and set interval if active
   useEffect(() => {
     pollSyncStatus();
     pollExerciseSyncStatus();
+    pollExercisePullStatus();
     const interval = setInterval(() => {
       pollSyncStatus();
       pollExerciseSyncStatus();
+      pollExercisePullStatus();
     }, 1500);
     return () => clearInterval(interval);
-  }, [isSyncing, isSyncingExercises]);
+  }, [isSyncing, isSyncingExercises, isSyncingPull]);
 
   const handleSyncAllGifs = async () => {
     if (isSyncing) return;
@@ -125,6 +157,26 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
       triggerSuccess('Sincronização de exercícios com o Firestore iniciada! Acompanhe o progresso na barra.');
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao conectar ao servidor para iniciar sincronização de exercícios.');
+    }
+  };
+
+  const handlePullAllExercises = async () => {
+    if (isSyncingPull) return;
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    
+    try {
+      const response = await fetch('/api/sync/exercises/pull', { method: 'POST' });
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Não foi possível iniciar a importação de exercícios.');
+      }
+      
+      const data = await response.json();
+      setIsSyncingPull(true);
+      triggerSuccess('Importação de exercícios do Firestore iniciada! Acompanhe o progresso.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao conectar ao servidor para iniciar importação de exercícios.');
     }
   };
 
@@ -664,6 +716,65 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
                 <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
                   <span className="text-emerald-400 font-bold">✔️ Enviados com Sucesso: {syncExCompleted}</span>
                   <span className="text-zinc-500">❌ Falhas: {syncExFailed}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Import Exercises from Firestore Button & Progress */}
+          <div className="bg-[#111111] border border-[rgba(57,255,20,0.15)] rounded-[24px] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.45)]" id="admin-pull-exercises-section">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-[#39FF14] animate-pulse"></span>
+                  <span>Importação de Banco de Dados (Firestore)</span>
+                </h3>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Puxa e atualiza todos os exercícios do Firestore diretamente para o site/backup local, mantendo a biblioteca 100% atualizada.
+                </p>
+              </div>
+
+              {!isSyncingPull ? (
+                <button
+                  onClick={handlePullAllExercises}
+                  className="px-5 py-3 rounded-[16px] bg-[#0D0D0D] hover:bg-[#39FF14] text-[#D1D5DB] hover:text-[#050505] text-xs font-bold uppercase tracking-wider transition-all duration-300 border border-[rgba(57,255,20,0.15)] hover:border-[#39FF14] hover:shadow-[0_0_15px_rgba(57,255,20,0.3)] flex items-center space-x-2"
+                  id="start-exercises-pull-btn"
+                >
+                  <span>📥 Puxar Exercícios do Firestore</span>
+                </button>
+              ) : (
+                <div className="text-xs text-zinc-400 font-mono flex items-center space-x-2 bg-[#0D0D0D] px-4 py-2.5 rounded-xl border border-[rgba(57,255,20,0.1)]">
+                  <Loader2 className="w-3.5 h-3.5 text-[#39FF14] animate-spin" />
+                  <span>Importando do Firestore...</span>
+                </div>
+              )}
+            </div>
+
+            {isSyncingPull && (
+              <div className="mt-6 space-y-3" id="exercises-pull-progress-details">
+                <div className="flex justify-between items-center text-xs text-zinc-400">
+                  <div className="flex items-center space-x-2 font-mono">
+                    <span className="text-[#39FF14] font-bold">{syncPullCurrent}</span>
+                    <span>/</span>
+                    <span className="text-zinc-500">{syncPullTotal}</span>
+                    <span>exercícios importados</span>
+                  </div>
+                  <span className="font-bold text-[#39FF14]">
+                    {syncPullTotal > 0 ? Math.round((syncPullCurrent / syncPullTotal) * 100) : 0}%
+                  </span>
+                </div>
+
+                {/* Progress bar tracks */}
+                <div className="h-2 w-full bg-[#0D0D0D] rounded-full overflow-hidden border border-[rgba(57,255,20,0.1)]">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-500 via-[#39FF14] to-lime-400 rounded-full transition-all duration-300"
+                    style={{ width: `${syncPullTotal > 0 ? (syncPullCurrent / syncPullTotal) * 100 : 0}%` }}
+                  ></div>
+                </div>
+
+                <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
+                  <span className="text-emerald-400 font-bold">✔️ Importados com Sucesso: {syncPullCompleted}</span>
+                  <span className="text-zinc-500">❌ Falhas: {syncPullFailed}</span>
                 </div>
               </div>
             )}

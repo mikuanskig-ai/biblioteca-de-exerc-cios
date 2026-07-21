@@ -755,6 +755,15 @@ let exerciseSyncProgress = {
   startTime: null as string | null,
 };
 
+let exercisePullProgress = {
+  isSyncing: false,
+  total: 0,
+  current: 0,
+  completed: 0,
+  failed: 0,
+  startTime: null as string | null,
+};
+
 // API Routes
 app.get('/api/exercises', async (req, res) => {
   try {
@@ -773,6 +782,92 @@ app.get('/api/sync/status', (req, res) => {
 
 app.get('/api/sync/exercises/status', (req, res) => {
   res.json(exerciseSyncProgress);
+});
+
+app.get('/api/sync/exercises/pull/status', (req, res) => {
+  res.json(exercisePullProgress);
+});
+
+app.post('/api/sync/exercises/pull', async (req, res) => {
+  if (exercisePullProgress.isSyncing) {
+    return res.status(400).json({ error: 'Importação de exercícios já está em andamento.' });
+  }
+
+  if (!db) {
+    return res.status(503).json({ error: 'Banco de dados Firestore não está inicializado ou desabilitado.' });
+  }
+
+  // Reset progress
+  exercisePullProgress = {
+    isSyncing: true,
+    total: 0,
+    current: 0,
+    completed: 0,
+    failed: 0,
+    startTime: new Date().toISOString(),
+  };
+
+  // Start background pulling process
+  (async () => {
+    try {
+      console.log('[SyncExercises] Buscando todos os exercícios do Firestore...');
+      const querySnapshot = await getDocs(collection(db, 'exercises'));
+      
+      if (querySnapshot.empty) {
+        console.log('[SyncExercises] Firestore está vazio.');
+        exercisePullProgress.isSyncing = false;
+        return;
+      }
+
+      const exercisesList: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        exercisesList.push(docSnap.data());
+      });
+
+      exercisePullProgress.total = exercisesList.length;
+      console.log(`[SyncExercises] ${exercisesList.length} exercícios encontrados na nuvem.`);
+
+      // Simulate step-by-step progress updating for visual immersion (identical to other sync animations)
+      const chunkSize = Math.max(1, Math.ceil(exercisesList.length / 10));
+      for (let i = 0; i < exercisesList.length; i += chunkSize) {
+        const currentChunk = exercisesList.slice(i, i + chunkSize);
+        exercisePullProgress.current += currentChunk.length;
+        exercisePullProgress.completed += currentChunk.length;
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Sort pulled exercises
+      exercisesList.sort((a, b) => {
+        const idA = parseInt(a.id?.replace('ex_', '') || '0', 10);
+        const idB = parseInt(b.id?.replace('ex_', '') || '0', 10);
+        return idA - idB;
+      });
+
+      // Update cachedExercises
+      cachedExercises = exercisesList;
+      
+      // Save locally
+      try {
+        const dir = path.dirname(EXERCISES_FILE_PATH);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(EXERCISES_FILE_PATH, JSON.stringify(cachedExercises, null, 2), 'utf8');
+        console.log(`[SyncExercises] Backup local atualizado com ${cachedExercises.length} exercícios salvos.`);
+      } catch (fileErr) {
+        console.error('[SyncExercises] Erro ao gravar backup local dos exercícios puxados:', fileErr);
+      }
+
+    } catch (err: any) {
+      console.error('[SyncExercises] Erro ao puxar exercícios do Firestore:', err);
+      exercisePullProgress.failed = exercisePullProgress.total - exercisePullProgress.completed;
+    } finally {
+      exercisePullProgress.isSyncing = false;
+    }
+  })();
+
+  res.json({ message: 'Importação de exercícios iniciada em segundo plano.', total: exercisePullProgress.total });
 });
 
 app.post('/api/sync/exercises', async (req, res) => {
