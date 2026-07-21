@@ -8,8 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
-import { createServer as createViteServer } from 'vite';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { initializeFirestore, collection, getDocs, setDoc, doc, deleteDoc, writeBatch, setLogLevel } from 'firebase/firestore';
 
 // Silenciar logs internos do SDK do Firestore para evitar logs irrelevantes de desconexão de canais ociosos (idle streams)
@@ -132,7 +131,7 @@ async function initFirebaseAndCache() {
     }
 
     if (config) {
-      const firebaseApp = initializeApp(config);
+      const firebaseApp = getApps().length === 0 ? initializeApp(config) : getApp();
       db = initializeFirestore(firebaseApp, {
         experimentalForceLongPolling: true
       }, config.firestoreDatabaseId || '(default)');
@@ -211,7 +210,34 @@ function getInitPromise(): Promise<void> {
 
 // REMOVIDO: getInitPromise() do escopo global. Agora a inicialização é 100% Lazy (no primeiro request da API).
 
-function readExercises(): any[] {
+async function fetchExercisesFromCloud(): Promise<any[]> {
+  if (!db) {
+    throw new Error('Banco de dados não inicializado.');
+  }
+  const querySnapshot = await getDocs(collection(db, 'exercises'));
+  const exercises: any[] = [];
+  querySnapshot.forEach((docSnap) => {
+    exercises.push(docSnap.data());
+  });
+  
+  // Ordenar por ID de exercício para manter a ordem lógica original consistente
+  exercises.sort((a, b) => {
+    const idA = parseInt(a.id?.replace('ex_', '') || '0', 10);
+    const idB = parseInt(b.id?.replace('ex_', '') || '0', 10);
+    return idA - idB;
+  });
+  return exercises;
+}
+
+async function readExercises(): Promise<any[]> {
+  if (db) {
+    try {
+      console.log('[Firebase] Buscando exercícios diretamente no Firestore (Tempo Real)...');
+      return await fetchExercisesFromCloud();
+    } catch (err: any) {
+      console.error('[Firebase] Erro ao buscar exercícios do Firestore, usando cache:', err.message || err);
+    }
+  }
   return cachedExercises;
 }
 
@@ -733,7 +759,7 @@ let exerciseSyncProgress = {
 app.get('/api/exercises', async (req, res) => {
   try {
     await getInitPromise();
-    const exercises = readExercises();
+    const exercises = await readExercises();
     res.json(exercises);
   } catch (err: any) {
     console.error('Erro ao buscar exercícios:', err);
@@ -881,7 +907,7 @@ app.post('/api/sync/all', async (req, res) => {
     return res.status(400).json({ error: 'Sincronização já está em andamento.' });
   }
 
-  const exercises = readExercises();
+  const exercises = await readExercises();
   if (exercises.length === 0) {
     return res.json({ message: 'Nenhum exercício para sincronizar.' });
   }
@@ -962,7 +988,7 @@ app.post('/api/sync/all', async (req, res) => {
 app.get('/api/exercises/:slug', async (req, res) => {
   try {
     await getInitPromise();
-    const exercises = readExercises();
+    const exercises = await readExercises();
     const exercise = exercises.find(ex => ex.slug === req.params.slug);
     if (!exercise) {
       return res.status(404).json({ error: 'Exercício não encontrado' });
@@ -977,7 +1003,7 @@ app.get('/api/exercises/:slug', async (req, res) => {
 app.post('/api/exercises', async (req, res) => {
   try {
     await getInitPromise();
-    const exercises = readExercises();
+    const exercises = await readExercises();
     const newEx = req.body;
 
     if (!newEx.nome) {
@@ -1041,7 +1067,7 @@ app.post('/api/exercises', async (req, res) => {
 app.put('/api/exercises/:id', async (req, res) => {
   try {
     await getInitPromise();
-    const exercises = readExercises();
+    const exercises = await readExercises();
     const index = exercises.findIndex(ex => ex.id === req.params.id);
 
     if (index === -1) {
@@ -1093,7 +1119,7 @@ app.put('/api/exercises/:id', async (req, res) => {
 app.delete('/api/exercises/:id', async (req, res) => {
   try {
     await getInitPromise();
-    const exercises = readExercises();
+    const exercises = await readExercises();
     const filtered = exercises.filter(ex => ex.id !== req.params.id);
 
     if (filtered.length === exercises.length) {
@@ -1261,6 +1287,7 @@ Foque em fornecer dados biomecanicamente corretos, com passo a passo didático, 
 // Vite middleware setup or production static files serving
 async function setupServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
