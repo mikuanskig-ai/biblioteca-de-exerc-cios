@@ -118,7 +118,10 @@ async function initFirebaseAndCache() {
   // 2. Inicializar Firebase de forma preguiçosa (Lazy) e resiliente a timeouts na Vercel
   try {
     let config: any = null;
-    const configPath = resolveFilePath('firebase-applet-config.json');
+    let configPath = resolveFilePath('firebase-applet-config.json');
+    if (!fs.existsSync(configPath)) {
+      configPath = resolveFilePath('firebase-applet-config.json', 'data');
+    }
     if (fs.existsSync(configPath)) {
       config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     } else if (process.env.FIREBASE_CONFIG) {
@@ -793,6 +796,12 @@ app.post('/api/sync/exercises/pull', async (req, res) => {
     return res.status(400).json({ error: 'Importação de exercícios já está em andamento.' });
   }
 
+  try {
+    await getInitPromise();
+  } catch (err: any) {
+    console.error('[SyncExercises] Erro de inicialização do Firebase no pull:', err);
+  }
+
   if (!db) {
     return res.status(503).json({ error: 'Banco de dados Firestore não está inicializado ou desabilitado.' });
   }
@@ -873,6 +882,12 @@ app.post('/api/sync/exercises/pull', async (req, res) => {
 app.post('/api/sync/exercises', async (req, res) => {
   if (exerciseSyncProgress.isSyncing) {
     return res.status(400).json({ error: 'Sincronização de exercícios já está em andamento.' });
+  }
+
+  try {
+    await getInitPromise();
+  } catch (err: any) {
+    console.error('[SyncExercises] Erro de inicialização do Firebase no push:', err);
   }
 
   // Se o cache estiver vazio, tenta ler do arquivo local
