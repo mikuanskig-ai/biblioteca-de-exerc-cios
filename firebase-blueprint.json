@@ -1,0 +1,31 @@
+{
+  "entities": {
+    "Exercise": {
+      "title": "Exercise",
+      "description": "Represents a physical exercise in the library",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "slug": { "type": "string" },
+        "categoria": { "type": "string" },
+        "grupoMuscular": { "type": "string" },
+        "subGrupo": { "type": "string" },
+        "nivel": { "type": "string" },
+        "equipamentos": { "type": "array" },
+        "musculos": { "type": "array" },
+        "descricao": { "type": "string" },
+        "objetivo": { "type": "string" },
+        "execucao": { "type": "array" },
+        "respiracao": { "type": "string" }
+      },
+      "required": ["id", "nome", "slug", "categoria", "grupoMuscular"]
+    }
+  },
+  "firestore": {
+    "/exercises/{exerciseId}": {
+      "schema": "Exercise",
+      "description": "The collection storing physical exercises data"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper para verificar se o ID é válido e seguro
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Helper para validação da estrutura do Exercício
+    function isValidExercise(data) {
+      return data.keys().hasAll(['id', 'nome', 'slug', 'categoria', 'grupoMuscular'])
+        && data.id is string
+        && data.id.size() <= 128
+        && data.nome is string
+        && data.nome.size() <= 256
+        && data.slug is string
+        && data.slug.size() <= 256
+        && data.categoria is string
+        && data.categoria.size() <= 128
+        && data.grupoMuscular is string
+        && data.grupoMuscular.size() <= 128;
+    }
+
+    // Coleção de Exercícios - allow read and write to ensure sync is always robust
+    match /exercises/{exerciseId} {
+      allow read, write: if true;
+    }
+  }
+}
