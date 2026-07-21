@@ -6,6 +6,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import { initializeApp } from 'firebase/app';
@@ -14,11 +15,47 @@ import { initializeFirestore, collection, getDocs, setDoc, doc, deleteDoc, write
 // Silenciar logs internos do SDK do Firestore para evitar logs irrelevantes de desconexão de canais ociosos (idle streams)
 setLogLevel('silent');
 
+// Safe __dirname determination
+let safeDirname = '';
+try {
+  safeDirname = __dirname;
+} catch (e) {
+  try {
+    safeDirname = path.dirname(fileURLToPath(import.meta.url));
+  } catch (e2) {
+    safeDirname = process.cwd();
+  }
+}
+
 const app = express();
 const PORT = 3000;
 
-// Resolve paths
-const EXERCISES_FILE_PATH = path.join(process.cwd(), 'data', 'exercises.json');
+// Resolve paths helper to find files in both local, docker and vercel serverless environments
+function resolveFilePath(fileName: string, subDir?: string): string {
+  const pathsToTry = [
+    // 1. Relative to process.cwd()
+    subDir ? path.join(process.cwd(), subDir, fileName) : path.join(process.cwd(), fileName),
+    // 2. Relative to safeDirname
+    subDir ? path.join(safeDirname, subDir, fileName) : path.join(safeDirname, fileName),
+    // 3. Relative to parent of safeDirname (e.g. running from dist/ or serverless bundles)
+    subDir ? path.join(safeDirname, '..', subDir, fileName) : path.join(safeDirname, '..', fileName),
+    // 4. Absolute path
+    subDir ? path.join('/', subDir, fileName) : path.join('/', fileName),
+  ];
+
+  for (const p of pathsToTry) {
+    if (fs.existsSync(p)) {
+      console.log(`[PathResolver] Encontrado ${fileName} em: ${p}`);
+      return p;
+    }
+  }
+  
+  const defaultPath = subDir ? path.join(process.cwd(), subDir, fileName) : path.join(process.cwd(), fileName);
+  console.warn(`[PathResolver] Arquivo ${fileName} não encontrado. Usando padrão: ${defaultPath}`);
+  return defaultPath;
+}
+
+const EXERCISES_FILE_PATH = resolveFilePath('exercises.json', 'data');
 
 // Body parser
 app.use(express.json());
@@ -81,9 +118,20 @@ async function initFirebaseAndCache() {
 
   // 2. Inicializar Firebase e sincronizar
   try {
-    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+    let config: any = null;
+    const configPath = resolveFilePath('firebase-applet-config.json');
     if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    } else if (process.env.FIREBASE_CONFIG) {
+      try {
+        config = JSON.parse(process.env.FIREBASE_CONFIG);
+        console.log('[Firebase] Carregada configuração a partir da variável de ambiente FIREBASE_CONFIG.');
+      } catch (e: any) {
+        console.error('[Firebase] Erro ao ler a variável de ambiente FIREBASE_CONFIG:', e.message);
+      }
+    }
+
+    if (config) {
       const firebaseApp = initializeApp(config);
       db = initializeFirestore(firebaseApp, {
         experimentalForceLongPolling: true
@@ -371,7 +419,7 @@ async function getExerciseDbData(): Promise<any[]> {
   }
 
   // 1. Try reading the local downloaded file cache first (extremely fast and offline!)
-  const EXERCISE_DB_CACHE_PATH = path.join(process.cwd(), 'data', 'exercisedb_cache.json');
+  const EXERCISE_DB_CACHE_PATH = resolveFilePath('exercisedb_cache.json', 'data');
   try {
     if (fs.existsSync(EXERCISE_DB_CACHE_PATH)) {
       const cacheRaw = fs.readFileSync(EXERCISE_DB_CACHE_PATH, 'utf8');
@@ -983,7 +1031,7 @@ Grupo muscular alvo principal: "${grupoMuscular || 'Geral'}".
 
 Foque em fornecer dados biomecanicamente corretos, com passo a passo didático, erros comuns, dicas de respiração e variações anatômicas.`;
 
-    const modelsToTry = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'];
+    const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview', 'gemini-2.5-flash', 'gemini-2.5-pro'];
     let response = null;
     let lastError = null;
 
@@ -1064,6 +1112,17 @@ Foque em fornecer dados biomecanicamente corretos, com passo a passo didático, 
           attempt++;
           console.warn(`Erro com o modelo ${modelName} na tentativa ${attempt}/${maxAttempts}:`, err.message || err);
           lastError = err;
+          
+          // Se o modelo estiver indisponível (503 UNAVAILABLE ou sobrecarregado), não adianta tentar novamente o mesmo modelo imediatamente.
+          // Vamos avançar diretamente para o próximo modelo da lista para garantir uma resposta rápida.
+          const errorStr = (err.message || String(err) || "").toLowerCase();
+          const isUnavailable = errorStr.includes("503") || errorStr.includes("unavailable") || errorStr.includes("high demand") || (err.status && (err.status === 503 || err.status === "UNAVAILABLE"));
+          
+          if (isUnavailable) {
+            console.log(`Modelo ${modelName} retornou 503/UNAVAILABLE. Pulando tentativas adicionais para este modelo...`);
+            break; // Sai do loop de tentativas e passa para o próximo modelo
+          }
+
           if (attempt < maxAttempts) {
             const delay = attempt * 1200; // 1200ms, 2400ms...
             console.log(`Aguardando ${delay}ms antes de tentar novamente o modelo ${modelName}...`);

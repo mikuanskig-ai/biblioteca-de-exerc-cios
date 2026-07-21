@@ -208,12 +208,13 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
   };
 
   // Trigger Gemini AI generation
-  const handleAIGenerate = async (customNome?: string, customCategoria?: CategoriaType, customGrupoMuscular?: GrupoMuscularType) => {
-    const searchNome = customNome || aiPromptName;
-    const searchCategoria = customCategoria || aiCategory;
-    const searchGrupoMuscular = customGrupoMuscular || aiMuscle;
+  const handleAIGenerate = async (customNome?: string | any, customCategoria?: CategoriaType, customGrupoMuscular?: GrupoMuscularType) => {
+    const nameToUse = (typeof customNome === 'string') ? customNome : '';
+    const searchNome = nameToUse || aiPromptName;
+    const searchCategoria = (typeof customNome === 'string' && customCategoria) ? customCategoria : aiCategory;
+    const searchGrupoMuscular = (typeof customNome === 'string' && customGrupoMuscular) ? customGrupoMuscular : aiMuscle;
 
-    if (!searchNome.trim()) {
+    if (!searchNome || typeof searchNome !== 'string' || !searchNome.trim()) {
       setErrorMsg('Por favor, informe o nome do exercício para que o Gemini consiga analisar.');
       return;
     }
