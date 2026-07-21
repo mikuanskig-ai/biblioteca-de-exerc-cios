@@ -9,7 +9,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeFirestore, collection, getDocs, setDoc, doc, deleteDoc, writeBatch, setLogLevel } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, collection, getDocs, setDoc, doc, deleteDoc, writeBatch, setLogLevel } from 'firebase/firestore';
 
 // Silenciar logs internos do SDK do Firestore para evitar logs irrelevantes de desconexão de canais ociosos (idle streams)
 setLogLevel('silent');
@@ -135,10 +135,15 @@ async function initFirebaseAndCache() {
 
     if (config) {
       const firebaseApp = getApps().length === 0 ? initializeApp(config) : getApp();
-      db = initializeFirestore(firebaseApp, {
-        experimentalForceLongPolling: true
-      }, config.firestoreDatabaseId || '(default)');
-      console.log('[Firebase] Firestore inicializado com sucesso.');
+      try {
+        db = initializeFirestore(firebaseApp, {
+          experimentalForceLongPolling: true
+        }, config.firestoreDatabaseId || '(default)');
+        console.log('[Firebase] Firestore inicializado com sucesso.');
+      } catch (e: any) {
+        console.log('[Firebase] Firestore já estava inicializado ou falhou na inicialização direta. Recuperando instância existente:', e.message || e);
+        db = getFirestore(firebaseApp, config.firestoreDatabaseId || '(default)');
+      }
 
       // Buscar exercícios do Firestore com timeout de segurança (4 segundos) para evitar travamento em funções serverless
       console.log('[Firebase] Buscando exercícios atualizados diretamente na nuvem (Firestore)...');
