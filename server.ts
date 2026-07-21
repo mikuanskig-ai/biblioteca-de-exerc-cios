@@ -105,18 +105,18 @@ async function deleteExerciseFromFirestore(id: string) {
 }
 
 async function initFirebaseAndCache() {
-  // 1. Carregar do backup local como fallback inicial síncrono/imediato
+  // 1. Carregar do backup local imediatamente como fallback síncrono e instantâneo
   try {
-    if (fs.existsSync(EXERCISES_FILE_PATH)) {
+    if (cachedExercises.length === 0 && fs.existsSync(EXERCISES_FILE_PATH)) {
       const data = fs.readFileSync(EXERCISES_FILE_PATH, 'utf8');
       cachedExercises = JSON.parse(data);
-      console.log(`Carregado backup local de ${cachedExercises.length} exercícios.`);
+      console.log(`[Cache] Backup local inicial carregado com sucesso (${cachedExercises.length} exercícios).`);
     }
   } catch (err) {
-    console.error('Erro ao ler backup local inicial:', err);
+    console.error('[Cache] Erro ao ler backup local inicial:', err);
   }
 
-  // 2. Inicializar Firebase e sincronizar
+  // 2. Inicializar Firebase de forma preguiçosa (Lazy) e resiliente a timeouts na Vercel
   try {
     let config: any = null;
     const configPath = resolveFilePath('firebase-applet-config.json');
@@ -136,36 +136,35 @@ async function initFirebaseAndCache() {
       db = initializeFirestore(firebaseApp, {
         experimentalForceLongPolling: true
       }, config.firestoreDatabaseId || '(default)');
-      console.log('Firebase Firestore inicializado com sucesso.');
+      console.log('[Firebase] Firestore inicializado com sucesso.');
 
-      // Buscar exercícios do Firestore
-      console.log('Carregando exercícios do Firestore...');
-      const querySnapshot = await getDocs(collection(db, 'exercises'));
+      // Buscar exercícios do Firestore com timeout de segurança (4 segundos) para evitar travamento em funções serverless
+      console.log('[Firebase] Buscando exercícios atualizados diretamente na nuvem (Firestore)...');
       
-      if (querySnapshot.empty) {
-        console.log('Firestore está vazio. Semeando com os exercícios do arquivo local...');
-        // Semear banco de dados com os exercícios que já existem localmente em lotes de 500
-        const batchSize = 500;
-        for (let i = 0; i < cachedExercises.length; i += batchSize) {
-          const chunk = cachedExercises.slice(i, i + batchSize);
-          const batch = writeBatch(db);
-          for (const ex of chunk) {
-            const docRef = doc(db, 'exercises', ex.id);
-            batch.set(docRef, ex);
-          }
-          await batch.commit();
-          console.log(`Semeado lote de ${chunk.length} exercícios no Firestore.`);
-        }
-        console.log(`Semeado ${cachedExercises.length} exercícios no Firestore.`);
-      } else {
+      const fetchPromise = getDocs(collection(db, 'exercises'));
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout de 4 segundos ao conectar com o Firestore')), 4000)
+      );
+
+      const querySnapshot = await Promise.race([fetchPromise, timeoutPromise]);
+      
+      if (querySnapshot && !querySnapshot.empty) {
         const firestoreExercises: any[] = [];
         querySnapshot.forEach((docSnap) => {
           firestoreExercises.push(docSnap.data());
         });
-        cachedExercises = firestoreExercises;
-        console.log(`Carregados ${cachedExercises.length} exercícios do Firestore com sucesso.`);
         
-        // Atualizar o arquivo local de backup caso não esteja na Vercel
+        // Ordenar por ID de exercício para manter a ordem lógica original consistente
+        firestoreExercises.sort((a, b) => {
+          const idA = parseInt(a.id?.replace('ex_', '') || '0', 10);
+          const idB = parseInt(b.id?.replace('ex_', '') || '0', 10);
+          return idA - idB;
+        });
+
+        cachedExercises = firestoreExercises;
+        console.log(`[Firebase] Sincronizado com a nuvem com sucesso! ${cachedExercises.length} exercícios carregados.`);
+        
+        // Atualizar o arquivo local de backup apenas fora da Vercel para desenvolvimento local
         if (!process.env.VERCEL) {
           try {
             const dir = path.dirname(EXERCISES_FILE_PATH);
@@ -174,15 +173,30 @@ async function initFirebaseAndCache() {
             }
             fs.writeFileSync(EXERCISES_FILE_PATH, JSON.stringify(cachedExercises, null, 2), 'utf8');
           } catch (e) {
-            console.error('Erro ao atualizar backup local:', e);
+            console.error('[Cache] Erro ao atualizar backup local de exercícios:', e);
           }
         }
+      } else {
+        // Se o Firestore estiver vazio, semeamos com os dados iniciais locais
+        console.log('[Firebase] Firestore vazio encontrado. Semeando dados iniciais na nuvem...');
+        const batchSize = 100;
+        for (let i = 0; i < cachedExercises.length; i += batchSize) {
+          const chunk = cachedExercises.slice(i, i + batchSize);
+          const batch = writeBatch(db);
+          for (const ex of chunk) {
+            const docRef = doc(db, 'exercises', ex.id);
+            batch.set(docRef, ex);
+          }
+          await batch.commit();
+        }
+        console.log(`[Firebase] Semeado com sucesso ${cachedExercises.length} exercícios no Firestore.`);
       }
     } else {
-      console.warn('Aviso: firebase-applet-config.json não encontrado. Firestore desabilitado.');
+      console.warn('[Firebase] Aviso: Configurações do Firebase não encontradas. O sistema está rodando localmente.');
     }
-  } catch (error) {
-    console.error('Erro ao inicializar Firebase / carregar do Firestore:', error);
+  } catch (error: any) {
+    console.error('[Firebase] Conexão com Firestore falhou ou expirou. Mantendo backup local cacheado:', error.message || error);
+    // Não lançamos o erro adiante pois o cachedExercises já possui dados do backup local, permitindo que a API responda normalmente.
   }
 }
 
@@ -195,8 +209,7 @@ function getInitPromise(): Promise<void> {
   return initPromise;
 }
 
-// Inicializar imediatamente em segundo plano ao carregar o módulo
-getInitPromise();
+// REMOVIDO: getInitPromise() do escopo global. Agora a inicialização é 100% Lazy (no primeiro request da API).
 
 function readExercises(): any[] {
   return cachedExercises;
