@@ -103,6 +103,44 @@ async function deleteExerciseFromFirestore(id: string) {
   }
 }
 
+function mergeExercises(local: any[], cloud: any[]): any[] {
+  const mergedMap = new Map<string, any>();
+  
+  // 1. Adicionar todos os exercícios da nuvem no mapa primeiro
+  for (const ex of cloud) {
+    if (ex && ex.id) {
+      mergedMap.set(ex.id, ex);
+    }
+  }
+  
+  // 2. Mesclar ou sobrescrever com os exercícios locais
+  for (const ex of local) {
+    if (ex && ex.id) {
+      const existing = mergedMap.get(ex.id);
+      if (!existing) {
+        mergedMap.set(ex.id, ex);
+      } else {
+        const localDate = ex.atualizadoEm ? new Date(ex.atualizadoEm).getTime() : 0;
+        const cloudDate = existing.atualizadoEm ? new Date(existing.atualizadoEm).getTime() : 0;
+        
+        if (localDate >= cloudDate) {
+          mergedMap.set(ex.id, ex);
+        } else {
+          mergedMap.set(ex.id, { ...ex, ...existing });
+        }
+      }
+    }
+  }
+  
+  const result = Array.from(mergedMap.values());
+  result.sort((a, b) => {
+    const idA = parseInt(a.id?.replace('ex_', '') || '0', 10);
+    const idB = parseInt(b.id?.replace('ex_', '') || '0', 10);
+    return idA - idB;
+  });
+  return result;
+}
+
 async function initFirebaseAndCache() {
   // 1. Carregar do backup local imediatamente como fallback síncrono e instantâneo
   try {
@@ -161,15 +199,36 @@ async function initFirebaseAndCache() {
           firestoreExercises.push(docSnap.data());
         });
         
-        // Ordenar por ID de exercício para manter a ordem lógica original consistente
-        firestoreExercises.sort((a, b) => {
-          const idA = parseInt(a.id?.replace('ex_', '') || '0', 10);
-          const idB = parseInt(b.id?.replace('ex_', '') || '0', 10);
-          return idA - idB;
+        // Mesclar de forma inteligente o backup local e o Firestore!
+        const merged = mergeExercises(cachedExercises, firestoreExercises);
+        
+        // Verificar quais exercícios locais novos ou atualizados precisam ser gravados no Firestore
+        const firestoreIds = new Set(firestoreExercises.map(ex => ex.id));
+        const toSaveToCloud = merged.filter(ex => {
+          if (!firestoreIds.has(ex.id)) return true; // Faltando na nuvem
+          const cloudEx = firestoreExercises.find(c => c.id === ex.id);
+          const localDate = ex.atualizadoEm ? new Date(ex.atualizadoEm).getTime() : 0;
+          const cloudDate = (cloudEx && cloudEx.atualizadoEm) ? new Date(cloudEx.atualizadoEm).getTime() : 0;
+          return localDate > cloudDate; // Local é mais novo
         });
 
-        cachedExercises = firestoreExercises;
-        console.log(`[Firebase] Sincronizado com a nuvem com sucesso! ${cachedExercises.length} exercícios carregados.`);
+        if (toSaveToCloud.length > 0) {
+          console.log(`[Firebase] Semeando/atualizando ${toSaveToCloud.length} exercícios na nuvem...`);
+          const batchSize = 100;
+          for (let i = 0; i < toSaveToCloud.length; i += batchSize) {
+            const chunk = toSaveToCloud.slice(i, i + batchSize);
+            const batch = writeBatch(db);
+            for (const ex of chunk) {
+              const docRef = doc(db, 'exercises', ex.id);
+              batch.set(docRef, ex, { merge: true });
+            }
+            await batch.commit();
+          }
+          console.log(`[Firebase] Sincronização automática em lote de ${toSaveToCloud.length} exercícios concluída.`);
+        }
+
+        cachedExercises = merged;
+        console.log(`[Firebase] Sincronizado com a nuvem com sucesso! ${cachedExercises.length} exercícios ativos no cache.`);
         
         // Atualizar o arquivo local de backup apenas fora da Vercel para desenvolvimento local
         if (!process.env.VERCEL) {
@@ -895,19 +954,22 @@ app.post('/api/sync/exercises', async (req, res) => {
     console.error('[SyncExercises] Erro de inicialização do Firebase no push:', err);
   }
 
-  // Se o cache estiver vazio, tenta ler do arquivo local
-  if (cachedExercises.length === 0) {
-    try {
-      if (fs.existsSync(EXERCISES_FILE_PATH)) {
-        const data = fs.readFileSync(EXERCISES_FILE_PATH, 'utf8');
-        cachedExercises = JSON.parse(data);
+  // Sempre tentar ler do arquivo local exercises.json para garantir que estamos enviando a versão correta/atualizada do usuário!
+  let exercisesToSync = cachedExercises;
+  try {
+    if (fs.existsSync(EXERCISES_FILE_PATH)) {
+      const data = fs.readFileSync(EXERCISES_FILE_PATH, 'utf8');
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        exercisesToSync = parsed;
+        console.log(`[SyncExercises] Carregados ${exercisesToSync.length} exercícios do arquivo local exercises.json para envio ao Firestore.`);
       }
-    } catch (err) {
-      console.error('Erro ao ler exercícios locais no endpoint de sync:', err);
     }
+  } catch (err) {
+    console.error('[SyncExercises] Erro ao ler exercícios locais no endpoint de sync:', err);
   }
 
-  if (cachedExercises.length === 0) {
+  if (exercisesToSync.length === 0) {
     return res.status(400).json({ error: 'Nenhum exercício encontrado localmente para sincronizar.' });
   }
 
@@ -918,7 +980,7 @@ app.post('/api/sync/exercises', async (req, res) => {
   // Reset do progresso
   exerciseSyncProgress = {
     isSyncing: true,
-    total: cachedExercises.length,
+    total: exercisesToSync.length,
     current: 0,
     completed: 0,
     failed: 0,
@@ -928,10 +990,10 @@ app.post('/api/sync/exercises', async (req, res) => {
   // Iniciar sincronização em plano de fundo
   (async () => {
     try {
-      console.log(`[SyncExercises] Iniciando sincronização forçada de ${cachedExercises.length} exercícios com o Firestore...`);
+      console.log(`[SyncExercises] Iniciando sincronização forçada de ${exercisesToSync.length} exercícios com o Firestore...`);
       const batchSize = 100; // Lote menor para evitar timeouts de requisições longas
-      for (let i = 0; i < cachedExercises.length; i += batchSize) {
-        const chunk = cachedExercises.slice(i, i + batchSize);
+      for (let i = 0; i < exercisesToSync.length; i += batchSize) {
+        const chunk = exercisesToSync.slice(i, i + batchSize);
         const batch = writeBatch(db);
         for (const ex of chunk) {
           const docRef = doc(db, 'exercises', ex.id);
@@ -955,6 +1017,9 @@ app.post('/api/sync/exercises', async (req, res) => {
         });
         cachedExercises = firestoreExercises;
         console.log(`[SyncExercises] Cache de exercícios atualizado com sucesso (${cachedExercises.length} itens).`);
+      } else {
+        // Fallback se o Firestore por algum motivo estiver vazio
+        cachedExercises = exercisesToSync;
       }
     } catch (err: any) {
       console.error('[SyncExercises] Erro na sincronização de exercícios:', err);
@@ -964,7 +1029,7 @@ app.post('/api/sync/exercises', async (req, res) => {
     }
   })();
 
-  res.json({ message: 'Sincronização de exercícios iniciada em segundo plano.', total: cachedExercises.length });
+  res.json({ message: 'Sincronização de exercícios iniciada em segundo plano.', total: exercisesToSync.length });
 });
 
 app.get('/api/proxy-gif', async (req, res) => {
