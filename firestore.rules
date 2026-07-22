@@ -22,9 +22,18 @@ service cloud.firestore {
         && data.grupoMuscular.size() <= 128;
     }
 
-    // Coleção de Exercícios - allow read and write to ensure sync is always robust
+    // Coleção de Exercícios
+    // Leitura pública (biblioteca é um catálogo público de treinos).
+    // Escrita: valida ao menos o formato do dado contra injeção de lixo/malformado.
+    // NOTA DE SEGURANÇA: sem Firebase Auth configurado, não há como o Firestore
+    // distinguir "o servidor confiável" de "qualquer visitante" - fechar create/update/delete
+    // para exigir um identity check real requer Firebase Auth (ou migrar o servidor para o
+    // Admin SDK com uma service account, que bypassa estas regras). Isso exige uma ação manual
+    // no Console do Firebase que não pode ser feita por aqui.
     match /exercises/{exerciseId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidId(exerciseId) && isValidExercise(request.resource.data);
+      allow delete: if true;
     }
   }
 }

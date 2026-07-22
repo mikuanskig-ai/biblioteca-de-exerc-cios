@@ -7,13 +7,13 @@ import { Dumbbell, UserCheck, Search, Sparkles } from 'lucide-react';
 
 interface HeaderProps {
   isAdmin: boolean;
-  setIsAdmin: (val: boolean) => void;
+  onLogout: () => void;
   activeView: 'library' | 'detail' | 'admin';
   setActiveView: (view: 'library' | 'detail' | 'admin') => void;
   onOpenLogin: () => void;
 }
 
-export default function Header({ isAdmin, setIsAdmin, activeView, setActiveView, onOpenLogin }: HeaderProps) {
+export default function Header({ isAdmin, onLogout, activeView, setActiveView, onOpenLogin }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-[#050505]/95 backdrop-blur-md border-b border-[rgba(57,255,20,0.15)]" id="app-header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -76,8 +76,7 @@ export default function Header({ isAdmin, setIsAdmin, activeView, setActiveView,
             <button
               onClick={() => {
                 if (isAdmin) {
-                  setIsAdmin(false);
-                  setActiveView('library');
+                  onLogout();
                 } else {
                   onOpenLogin();
                 }

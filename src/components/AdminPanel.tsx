@@ -14,9 +14,10 @@ interface AdminPanelProps {
   onUpdateExercise: (id: string, ex: Partial<Exercicio>) => Promise<Exercicio | null>;
   onDeleteExercise: (id: string) => Promise<boolean>;
   onRefreshExercises?: () => void;
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
-export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise, onDeleteExercise, onRefreshExercises }: AdminPanelProps) {
+export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise, onDeleteExercise, onRefreshExercises, authFetch }: AdminPanelProps) {
   // Sync state tracking (GIFs)
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncTotal, setSyncTotal] = useState(0);
@@ -126,7 +127,7 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
     setSuccessMsg(null);
     
     try {
-      const response = await fetch('/api/sync/all', { method: 'POST' });
+      const response = await authFetch('/api/sync/all', { method: 'POST' });
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || 'Não foi possível iniciar a sincronização.');
@@ -146,7 +147,7 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
     setSuccessMsg(null);
     
     try {
-      const response = await fetch('/api/sync/exercises', { method: 'POST' });
+      const response = await authFetch('/api/sync/exercises', { method: 'POST' });
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || 'Não foi possível iniciar a sincronização de exercícios.');
@@ -166,7 +167,7 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
     setSuccessMsg(null);
     
     try {
-      const response = await fetch('/api/sync/exercises/pull', { method: 'POST' });
+      const response = await authFetch('/api/sync/exercises/pull', { method: 'POST' });
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || 'Não foi possível iniciar a importação de exercícios.');
@@ -184,9 +185,7 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
   const [activeTab, setActiveTab] = useState<'list' | 'form' | 'security'>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Security and Password Change States
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  // Security tab: display name shown on the login screen (cosmetic only)
   const [customUsername, setCustomUsername] = useState(() => localStorage.getItem('admin_username') || 'BiaTisatto');
 
   // Search in Admin
@@ -330,7 +329,7 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
     setSuccessMsg(null);
 
     try {
-      const response = await fetch('/api/exercises/generate', {
+      const response = await authFetch('/api/exercises/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -443,30 +442,17 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
     }
   };
 
-  // Handle Security Credential Changes
+  // Handle display name change (the real admin password now lives server-side in ADMIN_PASSWORD
+  // and can only be changed by updating that environment variable in the deployment settings)
   const handleSecuritySubmit = (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (newPassword.length < 4) {
-      setErrorMsg('A nova senha precisa ter pelo menos 4 caracteres.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setErrorMsg('As senhas digitadas não coincidem. Por favor, verifique.');
-      return;
-    }
-
-    // Save user configuration to localStorage
     const trimmedUsername = customUsername.trim();
     localStorage.setItem('admin_username', trimmedUsername || 'BiaTisatto');
-    localStorage.setItem('admin_password', newPassword);
 
-    triggerSuccess(`Credenciais salvas! Usuário de acesso: "${trimmedUsername || 'BiaTisatto'}". Use a nova senha para o próximo login.`);
-    setNewPassword('');
-    setConfirmPassword('');
+    triggerSuccess(`Nome de exibição salvo! Vai aparecer como "${trimmedUsername || 'BiaTisatto'}" na tela de login.`);
   };
 
   // Handle Delete
@@ -1475,15 +1461,20 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
                 <Lock className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-sans text-lg text-white font-bold">Alterar Senha e Acesso</h3>
+                <h3 className="font-sans text-lg text-white font-bold">Nome de Exibição</h3>
                 <p className="text-[9px] text-[#39FF14] uppercase font-bold tracking-wider">Configurações de Segurança</p>
               </div>
             </div>
 
-            {/* Username */}
+            <div className="p-4 bg-[#0D0D0D] rounded-[16px] border border-[rgba(57,255,20,0.15)] text-[11px] text-zinc-400 leading-relaxed">
+              A senha de acesso agora é protegida diretamente no servidor e não pode mais ser alterada por aqui.
+              Para trocá-la, atualize a variável de ambiente <code className="text-[#39FF14] font-mono">ADMIN_PASSWORD</code> nas configurações do projeto na Vercel.
+            </div>
+
+            {/* Username (cosmetic display name only) */}
             <div className="space-y-1.5">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                Usuário de Acesso
+                Nome de Exibição no Login
               </label>
               <input
                 type="text"
@@ -1491,53 +1482,17 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
                 value={customUsername}
                 onChange={(e) => setCustomUsername(e.target.value)}
                 className="w-full px-4 py-3 bg-[#0D0D0D] border border-[rgba(57,255,20,0.15)] rounded-[16px] text-xs text-white placeholder-zinc-650 focus:outline-none focus:border-[#39FF14] transition-all duration-300"
-                placeholder="Digite o novo usuário"
+                placeholder="Digite o nome de exibição"
                 id="sec-username-input"
               />
-              <span className="text-[9px] text-zinc-500 font-mono block mt-1">Defina o nome de usuário utilizado para entrar nesta área do professor.</span>
-            </div>
-
-            {/* New Password */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                Nova Senha
-              </label>
-              <input
-                type="password"
-                required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-[#0D0D0D] border border-[rgba(57,255,20,0.15)] rounded-[16px] text-xs text-white placeholder-zinc-650 focus:outline-none focus:border-[#39FF14] transition-all duration-300"
-                placeholder="Mínimo de 4 caracteres"
-                id="sec-password-input"
-              />
-            </div>
-
-            {/* Confirm New Password */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                Confirmar Nova Senha
-              </label>
-              <input
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-[#0D0D0D] border border-[rgba(57,255,20,0.15)] rounded-[16px] text-xs text-white placeholder-zinc-650 focus:outline-none focus:border-[#39FF14] transition-all duration-300"
-                placeholder="Digite a nova senha novamente"
-                id="sec-confirm-password-input"
-              />
+              <span className="text-[9px] text-zinc-500 font-mono block mt-1">Apenas um rótulo visual da tela de login — não afeta o acesso.</span>
             </div>
 
             {/* Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-[rgba(57,255,20,0.15)]">
               <button
                 type="button"
-                onClick={() => {
-                  setActiveTab('list');
-                  setNewPassword('');
-                  setConfirmPassword('');
-                }}
+                onClick={() => setActiveTab('list')}
                 className="w-full sm:w-auto px-6 py-3 rounded-[16px] border border-[rgba(57,255,20,0.15)] text-xs font-semibold text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors"
                 id="sec-cancel-btn"
               >
@@ -1549,7 +1504,7 @@ export default function AdminPanel({ exercises, onAddExercise, onUpdateExercise,
                 id="sec-save-btn"
               >
                 <Save className="w-4 h-4 text-[#050505]" />
-                <span>Salvar Credenciais</span>
+                <span>Salvar</span>
               </button>
             </div>
           </form>

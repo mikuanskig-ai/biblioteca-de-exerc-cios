@@ -6,6 +6,9 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -56,8 +59,108 @@ function resolveFilePath(fileName: string, subDir?: string): string {
 
 const EXERCISES_FILE_PATH = resolveFilePath('exercises.json', 'data');
 
+// Security headers (CSP disabled: this app relies on inline styles/scripts from the Vite bundle,
+// a proper policy would require a broader rework of the frontend build to add nonces/hashes)
+app.use(helmet({ contentSecurityPolicy: false }));
+
 // Body parser
 app.use(express.json());
+
+// General abuse/DoS guardrail across the whole API
+app.use('/api/', rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
+
+// --- Admin Authentication ---
+// The admin password lives only in the server environment (never shipped to the client).
+// Successful login exchanges it for a short-lived, HMAC-signed session token.
+const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12h
+
+function getAdminSecret(): string {
+  const secret = process.env.ADMIN_PASSWORD;
+  if (!secret) {
+    throw new Error('ADMIN_PASSWORD não está configurada no ambiente do servidor.');
+  }
+  return secret;
+}
+
+function signPayload(payloadB64: string): string {
+  return crypto.createHmac('sha256', getAdminSecret()).update(payloadB64).digest('base64url');
+}
+
+function createSessionToken(): string {
+  const payload = JSON.stringify({ exp: Date.now() + TOKEN_TTL_MS });
+  const payloadB64 = Buffer.from(payload).toString('base64url');
+  return `${payloadB64}.${signPayload(payloadB64)}`;
+}
+
+function verifySessionToken(token: string): boolean {
+  try {
+    const [payloadB64, sig] = token.split('.');
+    if (!payloadB64 || !sig) return false;
+    const expectedSig = signPayload(payloadB64);
+    const sigBuf = Buffer.from(sig);
+    const expectedBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+      return false;
+    }
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+    return typeof payload.exp === 'number' && payload.exp > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function constantTimeEquals(a: string, b: string): boolean {
+  const aBuf = crypto.createHash('sha256').update(a).digest();
+  const bBuf = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+function requireAdmin(req: any, res: any, next: any) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token || !verifySessionToken(token)) {
+    return res.status(401).json({ error: 'Não autorizado. Faça login novamente.' });
+  }
+  next();
+}
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de login. Tente novamente em alguns minutos.' },
+});
+
+app.post('/api/admin/login', loginLimiter, (req: any, res: any) => {
+  const { password } = req.body || {};
+  let adminPassword: string;
+  try {
+    adminPassword = getAdminSecret();
+  } catch {
+    console.error('[Auth] ADMIN_PASSWORD não configurada no ambiente.');
+    return res.status(500).json({ error: 'Login administrativo não está configurado no servidor.' });
+  }
+
+  if (typeof password !== 'string' || !constantTimeEquals(password, adminPassword)) {
+    return res.status(401).json({ error: 'Senha incorreta.' });
+  }
+
+  res.json({ token: createSessionToken() });
+});
+
+const generateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Limite de gerações por IA atingido. Tente novamente mais tarde.' },
+});
 
 // Initialize Gemini API client lazily
 let aiClient: GoogleGenAI | null = null;
@@ -855,7 +958,7 @@ app.get('/api/sync/exercises/pull/status', (req, res) => {
   res.json(exercisePullProgress);
 });
 
-app.post('/api/sync/exercises/pull', async (req, res) => {
+app.post('/api/sync/exercises/pull', requireAdmin, async (req, res) => {
   if (exercisePullProgress.isSyncing) {
     return res.status(400).json({ error: 'Importação de exercícios já está em andamento.' });
   }
@@ -943,7 +1046,7 @@ app.post('/api/sync/exercises/pull', async (req, res) => {
   res.json({ message: 'Importação de exercícios iniciada em segundo plano.', total: exercisePullProgress.total });
 });
 
-app.post('/api/sync/exercises', async (req, res) => {
+app.post('/api/sync/exercises', requireAdmin, async (req, res) => {
   if (exerciseSyncProgress.isSyncing) {
     return res.status(400).json({ error: 'Sincronização de exercícios já está em andamento.' });
   }
@@ -1053,7 +1156,7 @@ app.get('/api/proxy-gif', async (req, res) => {
     ];
 
     const host = urlObj.hostname;
-    const isAllowed = allowedHosts.some(allowed => host.endsWith(allowed));
+    const isAllowed = allowedHosts.some(allowed => host === allowed || host.endsWith(`.${allowed}`));
 
     if (!isAllowed) {
       return res.status(403).send('Domínio não autorizado.');
@@ -1082,7 +1185,7 @@ app.get('/api/proxy-gif', async (req, res) => {
   }
 });
 
-app.post('/api/sync/all', async (req, res) => {
+app.post('/api/sync/all', requireAdmin, async (req, res) => {
   if (syncProgress.isSyncing) {
     return res.status(400).json({ error: 'Sincronização já está em andamento.' });
   }
@@ -1180,7 +1283,7 @@ app.get('/api/exercises/:slug', async (req, res) => {
   }
 });
 
-app.post('/api/exercises', async (req, res) => {
+app.post('/api/exercises', requireAdmin, async (req, res) => {
   try {
     await getInitPromise();
     const exercises = await readExercises();
@@ -1244,7 +1347,7 @@ app.post('/api/exercises', async (req, res) => {
   }
 });
 
-app.put('/api/exercises/:id', async (req, res) => {
+app.put('/api/exercises/:id', requireAdmin, async (req, res) => {
   try {
     await getInitPromise();
     const exercises = await readExercises();
@@ -1296,7 +1399,7 @@ app.put('/api/exercises/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/exercises/:id', async (req, res) => {
+app.delete('/api/exercises/:id', requireAdmin, async (req, res) => {
   try {
     await getInitPromise();
     const exercises = await readExercises();
@@ -1319,7 +1422,7 @@ app.delete('/api/exercises/:id', async (req, res) => {
 });
 
 // AI generation endpoint
-app.post('/api/exercises/generate', async (req, res) => {
+app.post('/api/exercises/generate', requireAdmin, generateLimiter, async (req, res) => {
   const { nome, categoria, grupoMuscular } = req.body;
 
   if (!nome) {

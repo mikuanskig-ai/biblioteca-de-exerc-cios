@@ -79,10 +79,30 @@ export default function App() {
     new Set(exercises.flatMap(ex => ex.equipamentos))
   ).sort()];
 
+  // Ends the admin session (used both for manual logout and expired/invalid tokens)
+  const endAdminSession = (message?: string) => {
+    localStorage.removeItem('admin_token');
+    setIsAdmin(false);
+    setActiveView('library');
+    if (message) setLoginError(message);
+  };
+
+  // Wraps fetch to attach the admin session token to write requests and auto-logout on 401
+  const authFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+    const token = localStorage.getItem('admin_token');
+    const headers = new Headers(options.headers || {});
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401) {
+      endAdminSession('Sessão expirada. Faça login novamente.');
+    }
+    return response;
+  };
+
   // API Integration: Add new exercise to backend
   const handleAddExercise = async (newEx: Partial<Exercicio>): Promise<Exercicio | null> => {
     try {
-      const response = await fetch('/api/exercises', {
+      const response = await authFetch('/api/exercises', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newEx)
@@ -101,7 +121,7 @@ export default function App() {
   // API Integration: Update existing exercise
   const handleUpdateExercise = async (id: string, updatedEx: Partial<Exercicio>): Promise<Exercicio | null> => {
     try {
-      const response = await fetch(`/api/exercises/${id}`, {
+      const response = await authFetch(`/api/exercises/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedEx)
@@ -123,7 +143,7 @@ export default function App() {
   // API Integration: Delete exercise
   const handleDeleteExercise = async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/exercises/${id}`, {
+      const response = await authFetch(`/api/exercises/${id}`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -140,28 +160,36 @@ export default function App() {
     return false;
   };
 
-  // Handle Admin Login Submission
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  // Handle Admin Login Submission - verified server-side, the real password never touches the client
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
     setIsLoggingIn(true);
 
-    const savedUsername = localStorage.getItem('admin_username') || 'BiaTisatto';
-    const savedPassword = localStorage.getItem('admin_password') || '159357tisatto';
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
 
-    // Realistic visual response delay for secure feeling
-    setTimeout(() => {
-      if (username.trim().toLowerCase() === savedUsername.toLowerCase() && password === savedPassword) {
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('admin_token', data.token);
         setIsAdmin(true);
         setActiveView('admin');
         setShowLoginModal(false);
         setUsername('');
         setPassword('');
       } else {
-        setLoginError('Usuário ou senha incorretos. Verifique suas credenciais.');
+        const errData = await response.json().catch(() => ({}));
+        setLoginError(errData.error || 'Usuário ou senha incorretos. Verifique suas credenciais.');
       }
+    } catch (err) {
+      setLoginError('Erro ao conectar com o servidor. Tente novamente.');
+    } finally {
       setIsLoggingIn(false);
-    }, 600);
+    }
   };
 
   // Reset all search search & filters
@@ -240,9 +268,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#08080A] flex flex-col selection:bg-[#39FF14]/20 selection:text-[#39FF14]" id="app-root">
       {/* Top Header */}
-      <Header 
+      <Header
         isAdmin={isAdmin}
-        setIsAdmin={setIsAdmin}
+        onLogout={() => endAdminSession()}
         activeView={activeView}
         setActiveView={setActiveView}
         onOpenLogin={() => {
@@ -257,12 +285,13 @@ export default function App() {
       <main className="flex-grow" id="app-main-content">
         {activeView === 'admin' && isAdmin ? (
           /* Render the professional admin panel */
-          <AdminPanel 
+          <AdminPanel
             exercises={exercises}
             onAddExercise={handleAddExercise}
             onUpdateExercise={handleUpdateExercise}
             onDeleteExercise={handleDeleteExercise}
             onRefreshExercises={fetchExercises}
+            authFetch={authFetch}
           />
         ) : activeView === 'detail' && selectedExercise ? (
           /* Render detail tutorial page */
