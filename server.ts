@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { initializeFirestore, getFirestore, collection, getDocs, setDoc, doc, deleteDoc, writeBatch, setLogLevel } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
 // Silenciar logs internos do SDK do Firestore para evitar logs irrelevantes de desconexão de canais ociosos (idle streams)
 setLogLevel('silent');
@@ -284,6 +285,25 @@ async function initFirebaseAndCache() {
       } catch (e: any) {
         console.log('[Firebase] Firestore já estava inicializado ou falhou na inicialização direta. Recuperando instância existente:', e.message || e);
         db = getFirestore(firebaseApp, config.firestoreDatabaseId || '(default)');
+      }
+
+      // Autentica o servidor com uma identidade dedicada (conta de serviço), para que as
+      // regras do Firestore consigam diferenciar escritas confiáveis (deste servidor) de
+      // qualquer visitante público tentando escrever direto pelo SDK do Firebase.
+      const serviceEmail = process.env.FIRESTORE_SERVICE_EMAIL;
+      const servicePassword = process.env.FIRESTORE_SERVICE_PASSWORD;
+      if (serviceEmail && servicePassword) {
+        try {
+          const auth = getAuth(firebaseApp);
+          if (!auth.currentUser) {
+            await signInWithEmailAndPassword(auth, serviceEmail, servicePassword);
+          }
+          console.log('[Firebase] Autenticado como conta de serviço no Firestore.');
+        } catch (authErr: any) {
+          console.error('[Firebase] Falha ao autenticar conta de serviço no Firestore:', authErr.message || authErr);
+        }
+      } else {
+        console.warn('[Firebase] FIRESTORE_SERVICE_EMAIL/FIRESTORE_SERVICE_PASSWORD não configuradas - escritas no Firestore serão negadas pelas regras de segurança.');
       }
 
       // Buscar exercícios do Firestore com timeout de segurança (4 segundos) para evitar travamento em funções serverless

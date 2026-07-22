@@ -22,18 +22,22 @@ service cloud.firestore {
         && data.grupoMuscular.size() <= 128;
     }
 
+    // Identidade dedicada usada apenas pelo servidor (Express/Vercel) para gravar no Firestore.
+    // Nenhum outro usuário consegue se autenticar com este e-mail (a senha só existe como
+    // variável de ambiente no servidor), então isto distingue "o backend confiável" de
+    // qualquer visitante que tente escrever direto pelo SDK do Firebase.
+    function isTrustedServer() {
+      return request.auth != null
+        && request.auth.token.email == 'firestore-server@bia-tisatto-exercicios.internal';
+    }
+
     // Coleção de Exercícios
     // Leitura pública (biblioteca é um catálogo público de treinos).
-    // Escrita: valida ao menos o formato do dado contra injeção de lixo/malformado.
-    // NOTA DE SEGURANÇA: sem Firebase Auth configurado, não há como o Firestore
-    // distinguir "o servidor confiável" de "qualquer visitante" - fechar create/update/delete
-    // para exigir um identity check real requer Firebase Auth (ou migrar o servidor para o
-    // Admin SDK com uma service account, que bypassa estas regras). Isso exige uma ação manual
-    // no Console do Firebase que não pode ser feita por aqui.
+    // Escrita: somente a conta de serviço do backend, com validação de schema como defesa extra.
     match /exercises/{exerciseId} {
       allow read: if true;
-      allow create, update: if isValidId(exerciseId) && isValidExercise(request.resource.data);
-      allow delete: if true;
+      allow create, update: if isTrustedServer() && isValidId(exerciseId) && isValidExercise(request.resource.data);
+      allow delete: if isTrustedServer();
     }
   }
 }
