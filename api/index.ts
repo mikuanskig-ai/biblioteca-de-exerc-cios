@@ -3,8 +3,10 @@ let app: any = null;
 export default async function handler(req: any, res: any) {
   try {
     if (!app) {
-      const serverModule = await import('../server');
-      app = serverModule.default;
+      const serverModule: any = await import('../server-dist/server.cjs');
+      // esbuild's CJS interop wraps the default export as { default: app };
+      // Node's ESM loader then wraps that again, so unwrap one extra level.
+      app = serverModule.default?.default ?? serverModule.default;
     }
     return app(req, res);
   } catch (err: any) {
