@@ -19,6 +19,7 @@ export default function BiomechanicsVisualizer({ exerciseId, exerciseName, gifUr
   const [viewMode, setViewMode] = useState<'animation' | 'media'>('animation');
   const [animationTick, setAnimationTick] = useState(0);
   const [isGifLoading, setIsGifLoading] = useState(true);
+  const [gifError, setGifError] = useState(false);
 
   // Toggle play/pause
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function BiomechanicsVisualizer({ exerciseId, exerciseName, gifUr
       setViewMode('animation');
     }
     setIsGifLoading(true);
+    setGifError(false);
   }, [gifUrl, videoUrl, exerciseId]);
 
   // Get current state values based on the animation tick
@@ -560,11 +562,11 @@ export default function BiomechanicsVisualizer({ exerciseId, exerciseName, gifUr
                   <span>Assistir no Canal da Bia</span>
                 </a>
               </div>
-            ) : gifUrl ? (
+            ) : gifUrl && !gifError ? (
               /* If it's an image/gif URL with modern lazy loading */
               <div className="relative w-full h-full flex items-center justify-center min-h-[250px]" id="gif-lazy-container">
                 {isGifLoading && (
-                  <div 
+                  <div
                     className="absolute inset-0 flex flex-col items-center justify-center bg-[#0C0C0E]/95 rounded-xl border border-[rgba(57,255,20,0.1)] space-y-3 z-10 animate-pulse"
                     id="gif-skeleton-loader"
                   >
@@ -575,8 +577,8 @@ export default function BiomechanicsVisualizer({ exerciseId, exerciseName, gifUr
                     </div>
                   </div>
                 )}
-                <img 
-                  src={gifUrl.startsWith('http') ? `/api/proxy-gif?url=${encodeURIComponent(gifUrl)}` : gifUrl} 
+                <img
+                  src={gifUrl.startsWith('http') ? `/api/proxy-gif?url=${encodeURIComponent(gifUrl)}` : gifUrl}
                   alt={`Demonstração de ${exerciseName}`}
                   className={`max-w-full max-h-full object-contain rounded-xl select-none transition-all duration-500 ease-out ${
                     isGifLoading ? 'scale-95 opacity-0 blur-sm' : 'scale-100 opacity-100 blur-none'
@@ -584,9 +586,15 @@ export default function BiomechanicsVisualizer({ exerciseId, exerciseName, gifUr
                   referrerPolicy="no-referrer"
                   loading="lazy"
                   onLoad={() => setIsGifLoading(false)}
-                  onError={() => setIsGifLoading(false)}
+                  onError={() => { setIsGifLoading(false); setGifError(true); }}
                   id="lazy-loaded-gif"
                 />
+              </div>
+            ) : gifUrl && gifError ? (
+              /* GIF source is unavailable (dead link upstream) - fall back gracefully instead of a broken image icon */
+              <div className="text-center p-6">
+                <ImageIcon className="w-10 h-10 text-zinc-700 mx-auto mb-2" />
+                <span className="text-xs text-zinc-500">GIF indisponível no momento. Use o Simulador ao lado!</span>
               </div>
             ) : (
               /* Fallback if somehow clicked media view with empty values */
